@@ -417,6 +417,10 @@
       <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="sidebarName">Loading…</div>
       <div class="user-email" id="sidebarEmail" style="margin-top:2px"></div>
       <div class="user-role" id="sidebarRole"></div>
+      <div id="sidebarLastSync" style="margin-top:5px;font-size:11px;color:var(--muted);display:none;">
+        <span style="text-transform:uppercase;letter-spacing:.4px;font-weight:600;font-size:10px;">Last sync</span><br>
+        <span id="sidebarLastSyncTime"></span>
+      </div>
       <div style="display:flex;gap:6px;margin-top:6px;">
         <button class="logout-btn" style="flex:1;margin-top:0" onclick="logout()">Sign out</button>
         <button class="logout-btn" style="margin-top:0;width:32px;flex-shrink:0;padding:3px 0;font-size:13px;" onclick="restartHelpTour()" title="Restart tour">?</button>
@@ -835,6 +839,7 @@ let _convBackView = 'sessions', _histFlat = [], _histSessionCache = [];
   if (currentUser.role === 'admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
   }
+  api('/api/sync/status').then(status => updateSidebarSyncDate(status));
   Promise.all([api('/api/demo-status'), api('/api/config')]).then(([s, cfg]) => {
     window._demoMode = !!cfg?.demoMode;
     if (cfg?.demoMode) {
@@ -1739,6 +1744,21 @@ function openHistoryEntry(idx) {
 }
 
 // ── Sync ─────────────────────────────────────────────────────────────────────
+function updateSidebarSyncDate(status) {
+  const wrap   = document.getElementById('sidebarLastSync');
+  const timeEl = document.getElementById('sidebarLastSyncTime');
+  if (!wrap || !timeEl) return;
+  if (status?.syncedAt) {
+    timeEl.textContent = fmtDateTime(status.syncedAt);
+    timeEl.style.color = '';
+    wrap.style.display = '';
+  } else {
+    timeEl.textContent = 'Never';
+    timeEl.style.color = 'var(--red)';
+    wrap.style.display = '';
+  }
+}
+
 function buildSyncCmd() {
   const baseUrl = window.location.origin;
   const token   = getToken();
@@ -1750,6 +1770,7 @@ async function loadSync() {
   const dot    = document.getElementById('syncDot');
   const timeEl = document.getElementById('syncTime');
 
+  updateSidebarSyncDate(status);
   if (status?.syncedAt) {
     dot.className = 'sync-dot synced';
     timeEl.innerHTML = `Last synced: <strong>${fmtDateTime(status.syncedAt)}</strong>`;
