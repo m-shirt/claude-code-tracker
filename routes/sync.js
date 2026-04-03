@@ -1,6 +1,6 @@
 const express    = require('express');
 const { execFile } = require('child_process');
-const { db, compress } = require('../db');
+const { db, compress, decompress } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -62,7 +62,6 @@ router.get('/status', requireAuth, (req, res) => {
 
   let sessionCount = 0;
   try {
-    const { decompress } = require('../db');
     const sessions = decompress(row.sessions);
     sessionCount = Array.isArray(sessions) ? sessions.length : 0;
   } catch {}

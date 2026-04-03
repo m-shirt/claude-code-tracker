@@ -1,21 +1,44 @@
-const express = require('express');
-const cors    = require('cors');
-const path    = require('path');
+const express   = require('express');
+const cors      = require('cors');
+const path      = require('path');
+const helmet    = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app  = express();
 const PORT = process.env.PORT || 3456;
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET must be set in production.');
+  process.exit(1);
+}
 if (!process.env.JWT_SECRET) {
   console.warn('\x1b[33mWARNING: JWT_SECRET not set — using insecure default. Set it before deploying!\x1b[0m');
 }
 
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '65mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const syncLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many sync requests. Try again shortly.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Routes
-app.use('/api/auth',  require('./routes/auth'));
-app.use('/api/sync',  require('./routes/sync'));
+app.use('/api/auth',  authLimiter, require('./routes/auth'));
+app.use('/api/sync',  syncLimiter, require('./routes/sync'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api',       require('./routes/data'));
 
@@ -34,6 +57,16 @@ const APP_HTML = path.join(__dirname, 'public', 'app.html');
   app.get(r, (_req, res) => res.sendFile(APP_HTML));
 });
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+
+// Centralized error handler
+app.use((err, _req, res, _next) => {
+  console.error(err.stack || err.message);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message,
+  });
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Claude Code Tracker v2 — http://localhost:${PORT}`);

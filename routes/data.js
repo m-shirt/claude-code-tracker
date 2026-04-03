@@ -111,12 +111,6 @@ router.get('/summary', requireAuth, (req, res) => {
     ? modelUsageFiltered
     : (stats?.modelUsage || {});
   if (!hasFilter) {
-    Object.values(stats?.modelUsage || {}).forEach(m => {
-      tokenInput  += (m.inputTokens          || 0);
-      tokenOutput += (m.outputTokens         || 0);
-      tokenCache  += (m.cacheReadInputTokens || 0);
-    });
-    // reset to stats-based totals
     tokenInput = 0; tokenOutput = 0; tokenCache = 0;
     Object.values(stats?.modelUsage || {}).forEach(m => {
       tokenInput  += (m.inputTokens          || 0);
