@@ -839,7 +839,7 @@ let _convBackView = 'sessions', _histFlat = [], _histSessionCache = [];
   if (currentUser.role === 'admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
   }
-  api('/api/sync/status').then(status => updateSidebarSyncDate(status));
+  api('/api/sync/status').then(status => updateSidebarSyncDate(status)).catch(() => {});
   Promise.all([api('/api/demo-status'), api('/api/config')]).then(([s, cfg]) => {
     window._demoMode = !!cfg?.demoMode;
     if (cfg?.demoMode) {
