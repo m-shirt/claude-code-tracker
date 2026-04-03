@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "claude-tracker",
+      "runtimeExecutable": "/Users/shirt/.nvm/versions/node/v22.20.0/bin/node",
+      "runtimeArgs": ["server.js"],
+      "port": 3456
+    }
+  ]
+}
