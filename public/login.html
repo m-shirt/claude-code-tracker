@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Tracker — Sign In</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  [data-theme="light"], :root {
+    --bg: #ffffff; --surface: #faf9f7; --surface2: #f0ede8;
+    --border: #e5e2dd; --text: #1a1a1a; --muted: #6b7280;
+    --accent: #d97706; --red: #dc2626; --green: #16a34a;
+  }
+  [data-theme="dark"] {
+    --bg: #0d0d0d; --surface: #161616; --surface2: #1f1f1f;
+    --border: #2a2a2a; --text: #e8e8e6; --muted: #888888;
+    --accent: #d97706; --red: #f85149; --green: #3fb950;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --bg: #0d0d0d; --surface: #161616; --surface2: #1f1f1f;
+      --border: #2a2a2a; --text: #e8e8e6; --muted: #888888;
+      --accent: #d97706; --red: #f85149; --green: #3fb950;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 36px; width: 380px; }
+
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; justify-content: center; }
+  .logo svg { color: var(--accent); }
+  .logo span { font-size: 18px; font-weight: 700; }
+
+  .tabs { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .tab { flex: 1; padding: 8px; text-align: center; cursor: pointer; font-size: 13px; color: var(--muted); background: var(--surface2); border: none; transition: all .15s; }
+  .tab.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .form-group { margin-bottom: 16px; }
+  .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  label { font-size: 12px; color: var(--muted); }
+
+  /* Password wrapper */
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 40px; }
+  .pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    display: flex; align-items: center; padding: 2px;
+  }
+  .pw-toggle:hover { color: var(--text); }
+
+  input[type="email"], input[type="password"], input[type="text"] {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 9px 12px; font-size: 14px; outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+
+  /* Suggest password button */
+  .suggest-btn {
+    background: none; border: none; cursor: pointer; font-size: 11px;
+    color: var(--accent); font-weight: 600; padding: 0; text-decoration: none;
+  }
+  .suggest-btn:hover { text-decoration: underline; }
+
+  .strength-bar { height: 4px; border-radius: 2px; margin-top: 6px; transition: all .3s; background: var(--border); width: 0%; }
+
+  .btn { width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .btn:hover { opacity: .9; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .error { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); color: var(--red); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .error.visible { display: block; }
+
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 20px; }
+  .hint span { color: var(--accent); }
+
+  .demo-box { background: rgba(217,119,6,.08); border: 1px solid rgba(217,119,6,.3); border-radius: 8px; padding: 12px 14px; margin-top: 18px; display: none; }
+  .demo-cred { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .demo-cred:last-child { margin-bottom: 0; }
+  .demo-cred-label { font-size: 11px; color: var(--muted); }
+  .demo-cred-val { font-size: 11px; font-family: monospace; background: var(--surface2); padding: 2px 7px; border-radius: 3px; cursor: pointer; color: var(--text); }
+  .demo-cred-val:hover { background: var(--border); }
+</style>
+<script>
+  (function() {
+    var t = localStorage.getItem('theme');
+    if (t && t !== 'system') document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    <span>Claude Code Tracker</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabSignIn" onclick="switchTab('signin')">Sign In</button>
+    <button class="tab" id="tabRegister" onclick="switchTab('register')">Register</button>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+
+  <!-- Sign In -->
+  <form id="formSignIn" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@example.com" required autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <div class="pw-wrap">
+        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+        <button type="button" class="pw-toggle" onclick="togglePw('loginPassword', this)" tabindex="-1" aria-label="Toggle password visibility">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="btn" type="submit" id="btnLogin">Sign In</button>
+  </form>
+
+  <!-- Register -->
+  <form id="formRegister" style="display:none" onsubmit="handleRegister(event)">
+    <div class="form-group">
+      <label>Display Name</label>
+      <input type="text" id="regName" placeholder="Your name" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email">
+    </div>
+    <div class="form-group">
+      <div class="label-row">
+        <label>Password <span style="color:var(--muted);font-size:11px;font-weight:400">(min 8 characters)</span></label>
+        <button type="button" class="suggest-btn" onclick="suggestPassword()">✨ Suggest Password</button>
+      </div>
+      <div class="pw-wrap">
+        <input type="password" id="regPassword" placeholder="••••••••" required autocomplete="new-password" oninput="updateRegStrength(this.value)">
+        <button type="button" class="pw-toggle" onclick="togglePw('regPassword', this)" tabindex="-1" aria-label="Toggle password visibility">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="strength-bar" id="regStrengthBar"></div>
+    </div>
+    <div class="form-group">
+      <label>Confirm Password</label>
+      <div class="pw-wrap">
+        <input type="password" id="regConfirm" placeholder="••••••••" required autocomplete="new-password">
+        <button type="button" class="pw-toggle" onclick="togglePw('regConfirm', this)" tabindex="-1" aria-label="Toggle password visibility">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="btn" type="submit" id="btnRegister">Create Account</button>
+  </form>
+
+  <p class="hint" id="hint">First account created becomes <span>admin</span></p>
+
+  <div class="demo-box" id="demoBox">
+    <div class="demo-cred">
+      <span class="demo-cred-label">Admin</span>
+      <span class="demo-cred-val" onclick="fillCreds('admin@claude-code-tracker.com','demo1234')" title="Click to fill">admin@claude-code-tracker.com / demo1234</span>
+    </div>
+    <div class="demo-cred">
+      <span class="demo-cred-label">User</span>
+      <span class="demo-cred-val" onclick="fillCreds('user@claude-code-tracker.com','demo1234')" title="Click to fill">user@claude-code-tracker.com / demo1234</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // SVG icons for eye toggle
+  const EYE_OPEN = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const EYE_SHUT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+  function togglePw(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    btn.innerHTML = isHidden ? EYE_SHUT : EYE_OPEN;
+  }
+
+  function updateRegStrength(val) {
+    const bar = document.getElementById('regStrengthBar');
+    let score = 0;
+    if (val.length >= 8)  score++;
+    if (val.length >= 12) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const colors = ['','#ef4444','#f97316','#eab308','#22c55e','#16a34a'];
+    const widths  = ['0%','25%','45%','65%','85%','100%'];
+    bar.style.background = colors[score] || 'var(--border)';
+    bar.style.width = val.length ? widths[Math.min(score,5)] : '0%';
+  }
+
+  // Password suggestion: 16 chars, mixed uppercase/lowercase/digits/symbols
+  function suggestPassword() {
+    const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower  = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const syms   = '!@#$%&*-+?';
+    const all    = upper + lower + digits + syms;
+    const arr    = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    // Guarantee at least one of each category
+    let pw = [
+      upper[arr[0]  % upper.length],
+      lower[arr[1]  % lower.length],
+      digits[arr[2] % digits.length],
+      syms[arr[3]   % syms.length],
+      ...Array.from(arr.slice(4), b => all[b % all.length])
+    ];
+    // Shuffle
+    for (let i = pw.length - 1; i > 0; i--) {
+      const j = arr[i] % (i + 1);
+      [pw[i], pw[j]] = [pw[j], pw[i]];
+    }
+    const password = pw.join('');
+    const pwInput      = document.getElementById('regPassword');
+    const confirmInput = document.getElementById('regConfirm');
+    pwInput.value      = password;
+    confirmInput.value = password;
+    // Show the password so user can see it
+    pwInput.type      = 'text';
+    confirmInput.type = 'text';
+    // Update eye icons to "open" state
+    document.querySelectorAll('#formRegister .pw-toggle').forEach(btn => btn.innerHTML = EYE_SHUT);
+    updateRegStrength(password);
+  }
+
+  // Show demo box if demo data exists
+  fetch('/api/demo-hint').then(r => r.json()).then(d => {
+    if (d.isDemo) document.getElementById('demoBox').style.display = 'block';
+  }).catch(() => {});
+
+  function fillCreds(email, password) {
+    document.getElementById('loginEmail').value    = email;
+    document.getElementById('loginPassword').value = password;
+    if (!document.getElementById('tabSignIn').classList.contains('active')) switchTab('signin');
+  }
+
+  // Redirect if already logged in
+  const existing = localStorage.getItem('claude_tracker_token');
+  if (existing) {
+    try {
+      const p = JSON.parse(atob(existing.split('.')[1]));
+      if (p.exp * 1000 > Date.now()) window.location.href = '/app';
+    } catch {}
+  }
+
+  function switchTab(tab) {
+    const isSignIn = tab === 'signin';
+    document.getElementById('tabSignIn').classList.toggle('active', isSignIn);
+    document.getElementById('tabRegister').classList.toggle('active', !isSignIn);
+    document.getElementById('formSignIn').style.display   = isSignIn ? '' : 'none';
+    document.getElementById('formRegister').style.display = isSignIn ? 'none' : '';
+    document.getElementById('hint').style.display         = isSignIn ? 'none' : '';
+    hideError();
+  }
+  document.getElementById('hint').style.display = 'none';
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+  function hideError() {
+    document.getElementById('errorMsg').classList.remove('visible');
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    hideError();
+    const btn = document.getElementById('btnLogin');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('loginEmail').value.trim(),
+          password: document.getElementById('loginPassword').value
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Login failed'); return; }
+      localStorage.setItem('claude_tracker_token', data.token);
+      window.location.href = '/app';
+    } catch(err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    hideError();
+    const pw = document.getElementById('regPassword').value;
+    if (pw !== document.getElementById('regConfirm').value) {
+      return showError('Passwords do not match');
+    }
+    const btn = document.getElementById('btnRegister');
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('regName').value.trim(),
+          email: document.getElementById('regEmail').value.trim(),
+          password: pw
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Registration failed'); return; }
+      localStorage.setItem('claude_tracker_token', data.token);
+      window.location.href = '/app';
+    } catch(err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create Account';
+    }
+  }
+
+  // Redirect to setup if no users exist yet
+  fetch('/api/setup/status').then(r => r.json()).then(d => {
+    if (d.needed) window.location.href = '/setup';
+  }).catch(() => {});
+</script>
+</body>
+</html>

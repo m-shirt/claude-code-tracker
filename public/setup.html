@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Tracker — Setup</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  [data-theme="light"], :root {
+    --bg:#ffffff;--surface:#faf9f7;--surface2:#f0ede8;
+    --border:#e5e2dd;--text:#1a1a1a;--muted:#6b7280;
+    --accent:#d97706;--red:#dc2626;--green:#16a34a;--blue:#2563eb;
+  }
+  [data-theme="dark"] {
+    --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;
+    --border:#2a2a2a;--text:#e8e8e6;--muted:#888888;
+    --accent:#d97706;--red:#f85149;--green:#3fb950;--blue:#60a5fa;
+  }
+  @media(prefers-color-scheme:dark){
+    :root:not([data-theme]){
+      --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;
+      --border:#2a2a2a;--text:#e8e8e6;--muted:#888888;
+      --accent:#d97706;--red:#f85149;--green:#3fb950;--blue:#60a5fa;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+
+  /* Progress bar */
+  .progress-wrap{width:100%;max-width:480px;margin:0 auto 28px;display:flex;align-items:center;gap:0;}
+  .prog-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;}
+  .prog-step:not(:last-child)::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:2px;background:var(--border);z-index:0;transition:background .3s;}
+  .prog-step.done:not(:last-child)::after{background:var(--accent);}
+  .prog-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);position:relative;z-index:1;transition:all .3s;}
+  .prog-step.active .prog-dot{border-color:var(--accent);background:var(--accent);color:#fff;}
+  .prog-step.done .prog-dot{border-color:var(--accent);background:var(--accent);color:#fff;}
+  .prog-label{font-size:11px;color:var(--muted);white-space:nowrap;}
+  .prog-step.active .prog-label{color:var(--accent);font-weight:600;}
+
+  /* Card */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:480px;animation:fadeUp .3s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:8px;justify-content:center;}
+  .logo svg{color:var(--accent);}
+  .logo span{font-size:20px;font-weight:700;}
+  .setup-badge{text-align:center;margin-bottom:28px;}
+  .setup-badge span{display:inline-block;background:rgba(217,119,6,.12);color:var(--accent);border:1px solid rgba(217,119,6,.3);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+
+  h2{font-size:18px;font-weight:700;margin-bottom:6px;text-align:center;}
+  .sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px;line-height:1.5;}
+
+  .form-group{margin-bottom:16px;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+  input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;transition:border-color .15s;}
+  input:focus{border-color:var(--accent);}
+  .pw-wrap{position:relative;}
+  .pw-wrap input{padding-right:40px;}
+  .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;padding:2px;}
+
+  .btn{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;margin-top:8px;}
+  .btn:hover{opacity:.88;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-outline{background:none;border:1px solid var(--border);color:var(--text);}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent);opacity:1;}
+  .btn-green{background:var(--green);}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .btn{margin-top:0;}
+
+  .err{background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:var(--red);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:16px;display:none;}
+  .strength{height:3px;border-radius:2px;margin-top:6px;transition:all .3s;background:var(--border);}
+
+  /* Tour slides */
+  .tour{display:none;flex-direction:column;gap:0;}
+  .tour.active{display:flex;}
+  .tour-slides{overflow:hidden;position:relative;}
+  .tour-track{display:flex;transition:transform .35s cubic-bezier(.4,0,.2,1);}
+  .tour-slide{min-width:100%;padding:0 4px;}
+  .slide-icon{font-size:40px;text-align:center;margin-bottom:12px;}
+  .slide-title{font-size:16px;font-weight:700;text-align:center;margin-bottom:8px;}
+  .slide-desc{font-size:13px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:20px;}
+  .slide-features{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+  .slide-feature{display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;}
+  .slide-feature .fi{font-size:18px;flex-shrink:0;margin-top:1px;}
+  .slide-feature .ft{font-size:13px;font-weight:600;color:var(--text);}
+  .slide-feature .fd{font-size:12px;color:var(--muted);margin-top:2px;}
+  .tour-dots{display:flex;justify-content:center;gap:6px;margin:16px 0 20px;}
+  .tour-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:all .2s;border:none;cursor:pointer;padding:0;}
+  .tour-dot.active{background:var(--accent);width:20px;border-radius:4px;}
+
+  /* Done step */
+  .done-icon{text-align:center;font-size:60px;margin-bottom:16px;}
+  .done-info{background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:20px;}
+  .done-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;}
+  .done-row:not(:last-child){border-bottom:1px solid var(--border);}
+  .done-row .dk{color:var(--muted);}
+  .done-row .dv{font-weight:600;color:var(--text);}
+</style>
+</head>
+<body>
+<div style="width:100%;max-width:480px;">
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressBar">
+    <div class="prog-step active" id="ps1">
+      <div class="prog-dot">1</div>
+      <span class="prog-label">Admin Account</span>
+    </div>
+    <div class="prog-step" id="ps2">
+      <div class="prog-dot">2</div>
+      <span class="prog-label">Quick Tour</span>
+    </div>
+    <div class="prog-step" id="ps3">
+      <div class="prog-dot">✓</div>
+      <span class="prog-label">All Set!</span>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <!-- Logo -->
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span>Claude Code Tracker</span>
+    </div>
+    <div class="setup-badge"><span>First-Time Setup</span></div>
+
+    <!-- ── STEP 1: Admin Account ── -->
+    <div id="step1">
+      <h2>Create your Admin account</h2>
+      <p class="sub">This will be the master account with full access to all data and settings.</p>
+      <div class="err" id="s1err"></div>
+      <div class="form-group">
+        <label>Your Name</label>
+        <input id="s1name" type="text" placeholder="e.g. John Smith" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input id="s1email" type="email" placeholder="admin@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label style="margin-bottom:0">Password</label>
+          <button type="button" onclick="setupSuggestPassword()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--accent);font-weight:600;padding:0;">✨ Suggest Password</button>
+        </div>
+        <div class="pw-wrap">
+          <input id="s1pass" type="password" placeholder="At least 8 characters" autocomplete="new-password" oninput="updateStrength(this.value)">
+          <button class="pw-toggle" type="button" onclick="togglePw('s1pass',this)" tabindex="-1">
+            <svg id="s1eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="strength" id="strengthBar"></div>
+      </div>
+      <button class="btn" id="s1btn" onclick="createAdmin()">Create Admin Account →</button>
+    </div>
+
+    <!-- ── STEP 2: Tour ── -->
+    <div id="step2" style="display:none">
+      <div class="tour active" id="tourEl">
+        <div class="tour-slides">
+          <div class="tour-track" id="tourTrack">
+
+            <!-- Slide 1: Overview -->
+            <div class="tour-slide">
+              <div class="slide-icon">📊</div>
+              <div class="slide-title">Your Claude Code Analytics Hub</div>
+              <div class="slide-desc">Everything you need to understand how you and your team use Claude Code — in one place.</div>
+              <div class="slide-features">
+                <div class="slide-feature"><span class="fi">🏠</span><div><div class="ft">Dashboard</div><div class="fd">Token usage, daily activity, top projects and model breakdown at a glance.</div></div></div>
+                <div class="slide-feature"><span class="fi">📁</span><div><div class="ft">Projects</div><div class="fd">All your Claude Code projects with session counts and message totals.</div></div></div>
+                <div class="slide-feature"><span class="fi">💬</span><div><div class="ft">Conversations</div><div class="fd">Every conversation session — searchable, with token counts per session.</div></div></div>
+              </div>
+            </div>
+
+            <!-- Slide 2: Sync -->
+            <div class="tour-slide">
+              <div class="slide-icon">🔄</div>
+              <div class="slide-title">Syncing Your Data</div>
+              <div class="slide-desc">After setup, head to the <strong>Sync</strong> page to get your personal one-liner command.</div>
+              <div class="slide-features">
+                <div class="slide-feature"><span class="fi">⚡</span><div><div class="ft">One-liner sync</div><div class="fd">Copy the command from the Sync page and run it in your terminal.</div></div></div>
+                <div class="slide-feature"><span class="fi">⏰</span><div><div class="ft">Auto-sync with cron</div><div class="fd">Set up a cron job to sync your data automatically every hour.</div></div></div>
+                <div class="slide-feature"><span class="fi">🔒</span><div><div class="ft">Personal token</div><div class="fd">Each user gets their own auth token — your data stays private.</div></div></div>
+              </div>
+            </div>
+
+            <!-- Slide 3: Admin -->
+            <div class="tour-slide">
+              <div class="slide-icon">🛡️</div>
+              <div class="slide-title">Admin Controls</div>
+              <div class="slide-desc">As the admin you have full visibility and control over the entire instance.</div>
+              <div class="slide-features">
+                <div class="slide-feature"><span class="fi">👥</span><div><div class="ft">Users page</div><div class="fd">Manage all users, view anyone's data, change roles, and remove accounts.</div></div></div>
+                <div class="slide-feature"><span class="fi">🗄️</span><div><div class="ft">Database page</div><div class="fd">View DB stats, download backups, restore from backup, and run VACUUM.</div></div></div>
+                <div class="slide-feature"><span class="fi">📅</span><div><div class="ft">Date filter</div><div class="fd">Filter the entire dashboard by preset ranges or a custom From–To date.</div></div></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="tour-dots" id="tourDots"></div>
+        <div class="btn-row">
+          <button class="btn btn-outline" id="tourPrev" onclick="tourNav(-1)" style="display:none">← Back</button>
+          <button class="btn" id="tourNext" onclick="tourNav(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Done ── -->
+    <div id="step3" style="display:none">
+      <div class="done-icon">🎉</div>
+      <h2>You're all set!</h2>
+      <p class="sub" style="margin-bottom:20px">Your admin account is ready. Head to the app and sync your first dataset.</p>
+      <div class="done-info" id="doneInfo"></div>
+      <button class="btn btn-green" onclick="goToApp()">Go to the App →</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Suggest Password ─────────────────────────────────────────────────────────
+function setupSuggestPassword() {
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower  = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const syms   = '!@#$%&*-+?';
+  const all    = upper + lower + digits + syms;
+  const arr    = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  let pw = [
+    upper[arr[0]  % upper.length],
+    lower[arr[1]  % lower.length],
+    digits[arr[2] % digits.length],
+    syms[arr[3]   % syms.length],
+    ...Array.from(arr.slice(4), b => all[b % all.length])
+  ];
+  for (let i = pw.length - 1; i > 0; i--) {
+    const j = arr[i] % (i + 1);
+    [pw[i], pw[j]] = [pw[j], pw[i]];
+  }
+  const password = pw.join('');
+  const inp = document.getElementById('s1pass');
+  inp.value = password;
+  inp.type  = 'text';
+  updateStrength(password);
+}
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+const saved = localStorage.getItem('theme');
+if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+// ── Redirect if already has users ────────────────────────────────────────────
+fetch('/api/setup/status').then(r => r.json()).then(d => {
+  if (!d.needed) window.location.href = '/';
+}).catch(() => {});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = msg ? '' : 'none';
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  btn.innerHTML = showing
+    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+}
+
+function updateStrength(val) {
+  const bar = document.getElementById('strengthBar');
+  let score = 0;
+  if (val.length >= 8)  score++;
+  if (val.length >= 12) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const colors = ['','#ef4444','#f97316','#eab308','#22c55e','#16a34a'];
+  const widths = ['0%','25%','45%','65%','85%','100%'];
+  bar.style.background = colors[score] || 'var(--border)';
+  bar.style.width = val.length ? widths[Math.min(score,5)] : '0%';
+  bar.style.height = val.length ? '4px' : '3px';
+}
+
+// ── Step 1: Create Admin ──────────────────────────────────────────────────────
+let _adminUser = null;
+
+async function createAdmin() {
+  const name  = document.getElementById('s1name').value.trim();
+  const email = document.getElementById('s1email').value.trim();
+  const pass  = document.getElementById('s1pass').value;
+  showErr('s1err', '');
+
+  if (!email) return showErr('s1err', 'Email is required.');
+  if (!pass || pass.length < 8) return showErr('s1err', 'Password must be at least 8 characters.');
+
+  const btn = document.getElementById('s1btn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, name })
+    });
+    const data = await res.json();
+    if (!res.ok) { showErr('s1err', data.error || 'Registration failed.'); btn.disabled=false; btn.textContent='Create Admin Account →'; return; }
+
+    _adminUser = data.user;
+    localStorage.setItem('claude_tracker_token', data.token);
+    goToStep(2);
+  } catch (e) {
+    showErr('s1err', 'Network error. Is the server running?');
+    btn.disabled = false;
+    btn.textContent = 'Create Admin Account →';
+  }
+}
+
+// ── Step navigation ───────────────────────────────────────────────────────────
+function goToStep(n) {
+  document.getElementById('step1').style.display = n===1 ? '' : 'none';
+  document.getElementById('step2').style.display = n===2 ? '' : 'none';
+  document.getElementById('step3').style.display = n===3 ? '' : 'none';
+
+  ['ps1','ps2','ps3'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i+1 < n) el.classList.add('done');
+    if (i+1 === n) el.classList.add('active');
+  });
+
+  if (n === 2) initTour();
+  if (n === 3) showDone();
+}
+
+// ── Tour ──────────────────────────────────────────────────────────────────────
+let _tourSlide = 0;
+const TOUR_TOTAL = 3;
+
+function initTour() {
+  const dots = document.getElementById('tourDots');
+  dots.innerHTML = '';
+  for (let i = 0; i < TOUR_TOTAL; i++) {
+    const d = document.createElement('button');
+    d.className = 'tour-dot' + (i===0?' active':'');
+    d.onclick = () => goToSlide(i);
+    dots.appendChild(d);
+  }
+  goToSlide(0);
+}
+
+function goToSlide(n) {
+  _tourSlide = n;
+  document.getElementById('tourTrack').style.transform = `translateX(-${n*100}%)`;
+  document.querySelectorAll('.tour-dot').forEach((d,i) => d.classList.toggle('active', i===n));
+  document.getElementById('tourPrev').style.display = n > 0 ? '' : 'none';
+  document.getElementById('tourNext').textContent = n === TOUR_TOTAL-1 ? 'Finish →' : 'Next →';
+}
+
+function tourNav(dir) {
+  const next = _tourSlide + dir;
+  if (next >= TOUR_TOTAL) { goToStep(3); return; }
+  if (next < 0) return;
+  goToSlide(next);
+}
+
+// ── Done ──────────────────────────────────────────────────────────────────────
+function showDone() {
+  const u = _adminUser || {};
+  document.getElementById('doneInfo').innerHTML = `
+    <div class="done-row"><span class="dk">Name</span><span class="dv">${u.name||'—'}</span></div>
+    <div class="done-row"><span class="dk">Email</span><span class="dv">${u.email||'—'}</span></div>
+    <div class="done-row"><span class="dk">Role</span><span class="dv">Admin</span></div>
+  `;
+}
+
+function goToApp() {
+  window.location.href = '/app';
+}
+</script>
+</body>
+</html>

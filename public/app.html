@@ -1,0 +1,2390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Tracker</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  /* ── Light theme (default) ── */
+  [data-theme="light"], :root {
+    --bg:#ffffff;--surface:#faf9f7;--surface2:#f0ede8;--border:#e5e2dd;
+    --text:#1a1a1a;--muted:#6b7280;--accent:#d97706;--accent2:#7c3aed;
+    --green:#16a34a;--blue:#2563eb;--red:#dc2626;
+  }
+  /* ── Dark theme ── */
+  [data-theme="dark"] {
+    --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;--border:#2a2a2a;
+    --text:#e8e8e6;--muted:#888888;--accent:#d97706;--accent2:#7c3aed;
+    --green:#3fb950;--blue:#58a6ff;--red:#f85149;
+  }
+  /* ── System preference (no explicit theme set) ── */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;--border:#2a2a2a;
+      --text:#e8e8e6;--muted:#888888;--accent:#d97706;--accent2:#7c3aed;
+      --green:#3fb950;--blue:#58a6ff;--red:#f85149;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;}
+  .app{display:flex;height:100vh;overflow:hidden;}
+  .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+  .main{flex:1;overflow-y:auto;background:var(--bg);}
+  .sidebar-header{padding:16px 16px 12px;border-bottom:1px solid var(--border);}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--text);}
+  .logo svg{color:var(--accent);}
+  .nav{padding:8px 0;flex:1;overflow-y:auto;}
+  .nav-item{display:flex;align-items:center;gap:9px;padding:7px 12px;color:var(--muted);cursor:pointer;font-size:13px;border-radius:6px;margin:1px 8px;transition:all .15s;}
+  .nav-item:hover{color:var(--text);background:var(--surface2);}
+  .nav-item.active{color:var(--text);background:var(--surface2);}
+  .nav-item svg{flex-shrink:0;}
+  .nav-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:14px 16px 4px;font-weight:600;}
+  .sidebar-user{padding:10px 14px;border-top:1px solid var(--border);}
+  .user-email{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .user-role{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-top:3px;}
+  .role-admin{background:rgba(217,119,6,.15);color:var(--accent);}
+  .role-user{background:rgba(37,99,235,.1);color:var(--blue);}
+  .logout-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;margin-top:6px;width:100%;}
+  .logout-btn:hover{color:var(--red);border-color:var(--red);}
+
+  /* ── Theme toggle ── */
+  .theme-toggle{display:flex;gap:4px;padding:10px 14px 8px;border-top:1px solid var(--border);}
+  .theme-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 4px;background:none;border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s;border-radius:5px;}
+  .theme-btn:hover{color:var(--text);background:var(--surface2);}
+  .theme-btn.active{background:var(--surface2);color:var(--text);}
+  .theme-btn span{display:inline-block;}
+
+  /* Views */
+  .view{display:none;padding:22px;}
+  .view.active{display:block;}
+  .page-header{margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .page-header h1{font-size:20px;font-weight:600;}
+  .page-header p{color:var(--muted);margin-top:3px;font-size:13px;}
+
+  /* Date filter */
+  .date-filter{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .date-preset{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .15s;}
+  .date-preset:hover{border-color:var(--accent);color:var(--accent);}
+  .date-preset.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .date-range-inputs{display:flex;align-items:center;gap:4px;}
+  .date-range-inputs input[type=date]{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;background:var(--surface);color:var(--text);outline:none;width:130px;}
+  .date-range-inputs input[type=date]:focus{border-color:var(--accent);}
+
+  /* Viewing-as banner */
+  .as-banner{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;}
+  .as-banner button{background:none;border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;margin-left:auto;}
+  .as-banner button:hover{background:var(--surface2);}
+
+  /* Stat bar */
+  .page-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+  .pstat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:110px;}
+  .pstat.accent{border-color:var(--accent);}
+  .pstat .ps-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .pstat .ps-value{font-size:20px;font-weight:700;line-height:1.1;}
+  .pstat .ps-sub{font-size:11px;color:var(--muted);}
+
+  /* Stats grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px;}
+  .stat-card.accent{border-color:var(--accent);}
+  .stat-card .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .stat-card .value{font-size:22px;font-weight:700;margin-top:4px;line-height:1;}
+  .stat-card .sub{font-size:11px;color:var(--muted);margin-top:3px;}
+
+  .section{margin-bottom:22px;}
+  .section-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+  .activity-chart{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 14px 8px;}
+  .activity-bars{display:flex;align-items:flex-end;gap:4px;height:70px;}
+  .activity-bar-wrap{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
+  .activity-bar{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85;}
+  .activity-bar:hover{opacity:1;}
+  .activity-labels{display:flex;gap:4px;margin-top:4px;}
+  .activity-label{flex:1;text-align:center;font-size:9px;color:var(--muted);overflow:hidden;}
+  .model-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .model-row{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+  .model-row:last-child{border-bottom:none;}
+  .model-name{font-size:12px;font-family:monospace;color:var(--blue);min-width:160px;}
+  .model-bar-wrap{flex:1;background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;}
+  .model-bar{height:100%;background:var(--accent2);border-radius:4px;}
+  .model-tokens{font-size:11px;color:var(--muted);min-width:70px;text-align:right;}
+
+  /* Projects */
+  .projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .project-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px;cursor:pointer;transition:border-color .15s;}
+  .project-card:hover{border-color:var(--accent);}
+  .project-card .proj-name{font-size:13px;font-weight:600;word-break:break-all;line-height:1.4;}
+  .project-card .proj-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .badge{background:var(--surface2);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--muted);}
+  .badge.green{background:rgba(63,185,80,.12);color:var(--green);}
+  .badge.blue{background:rgba(88,166,255,.1);color:var(--blue);}
+  .project-card .proj-date{font-size:11px;color:var(--muted);margin-top:5px;}
+
+  /* Filters */
+  .filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+  .search-input{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 11px;font-size:13px;flex:1;min-width:160px;outline:none;}
+  .search-input:focus{border-color:var(--accent);}
+  .select-input{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 11px;font-size:13px;outline:none;cursor:pointer;}
+  .filter-count{font-size:12px;color:var(--muted);white-space:nowrap;}
+
+  /* Groups */
+  .group{margin-bottom:12px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .group-header{padding:9px 13px;background:var(--surface2);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+  .group-header:hover{background:var(--border);}
+  .group-chevron{color:var(--muted);font-size:10px;transition:transform .2s;flex-shrink:0;}
+  .group.collapsed .group-chevron{transform:rotate(-90deg);}
+  .group-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .group-stats{display:flex;gap:8px;flex-shrink:0;}
+  .gstat{font-size:11px;color:var(--muted);white-space:nowrap;}
+  .gstat strong{color:var(--text);font-weight:600;}
+  .group.collapsed .group-body{display:none;}
+
+  .tbl{width:100%;border-collapse:collapse;}
+  .tbl th{padding:7px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .tbl td{padding:8px 13px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+  .tbl tr:last-child td{border-bottom:none;}
+  .tbl tr:hover td{background:var(--surface2);}
+  .tbl tr.clickable{cursor:pointer;}
+  .tbl tr.no-session td{opacity:.45;}
+  .msg-count{display:inline-block;background:var(--surface2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--muted);margin-left:6px;vertical-align:middle;}
+  .msg-count.has-msgs{background:rgba(63,185,80,.12);color:var(--green);}
+  .msg-count.no-msgs{background:rgba(248,81,73,.1);color:var(--red);}
+  .tbl .preview-cell{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);}
+  .tbl .time-cell{white-space:nowrap;color:var(--muted);font-size:12px;}
+  .proj-tag{background:var(--surface2);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--muted);font-family:monospace;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;}
+
+  /* Conversation */
+  .conv-header{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+  .back-btn{background:none;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;white-space:nowrap;}
+  .back-btn:hover{background:var(--surface2);}
+  .conv-info{flex:1;min-width:0;}
+  .conv-title{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .conv-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .messages{display:flex;flex-direction:column;gap:10px;}
+  .msg{border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+  .msg-header{padding:7px 12px;font-size:11px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .msg.user .msg-header{background:rgba(88,166,255,.07);color:var(--blue);}
+  .msg.assistant .msg-header{background:rgba(217,119,6,.07);color:var(--accent);}
+  .msg.summary .msg-header{background:rgba(63,185,80,.07);color:var(--green);}
+  .msg.summary .msg-body{color:var(--muted);font-style:italic;}
+  .msg-body{padding:10px 12px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+  .msg-body:empty{display:none;}
+  @keyframes msg-flash { 0%{box-shadow:0 0 0 3px var(--accent);background:rgba(217,119,6,.08);} 100%{box-shadow:none;background:transparent;} }
+  .msg.highlighted{animation:msg-flash 2s ease-out forwards;border-color:var(--accent);}
+  .tool-calls{padding:6px 12px 10px;display:flex;flex-direction:column;gap:5px;}
+  .tool-call{background:var(--surface2);border-radius:6px;overflow:hidden;}
+  .tool-call-header{padding:5px 9px;font-size:11px;font-family:monospace;color:var(--green);display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .tool-call-header:hover{background:var(--border);}
+  .tool-call-body{padding:7px 9px;font-size:11px;font-family:monospace;color:var(--muted);white-space:pre-wrap;max-height:160px;overflow-y:auto;display:none;}
+  .tool-call-body.open{display:block;}
+  .usage-pill{background:var(--surface2);border-radius:20px;padding:2px 7px;font-size:10px;color:var(--muted);}
+
+  /* Sync view */
+  .sync-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:16px;}
+  .sync-card h3{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
+  .sync-status-row{display:flex;align-items:center;gap:12px;}
+  .sync-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .sync-dot.synced{background:var(--green);box-shadow:0 0 6px rgba(63,185,80,.5);}
+  .sync-dot.never{background:var(--red);box-shadow:0 0 6px rgba(248,81,73,.4);}
+  .sync-time{font-size:14px;font-weight:500;}
+  .sync-time strong{color:var(--text);}
+  .sync-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;}
+  .sync-btn:hover{opacity:.9;}
+  .command-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-family:monospace;font-size:12px;color:var(--green);position:relative;margin-top:4px;line-height:1.5;word-break:break-all;padding-right:70px;}
+  .copy-btn{position:absolute;top:10px;right:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+  .copy-btn:hover{color:var(--text);border-color:var(--accent);}
+  .copy-btn.copied{color:var(--green);border-color:var(--green);}
+  .sync-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .sync-stat{background:var(--surface2);border-radius:8px;padding:10px 14px;min-width:90px;}
+  .sync-stat .ss-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .sync-stat .ss-value{font-size:18px;font-weight:700;margin-top:3px;}
+  /* Onboarding modal */
+  .ob-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px);}
+  .ob-modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;max-width:520px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.5);}
+  .ob-icon{width:48px;height:48px;background:rgba(217,119,6,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;}
+  .ob-title{font-size:20px;font-weight:700;margin-bottom:8px;}
+  .ob-sub{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5;}
+  .ob-steps{display:flex;flex-direction:column;gap:12px;margin-bottom:24px;}
+  .ob-step{display:flex;align-items:flex-start;gap:12px;}
+  .ob-step-num{width:24px;height:24px;border-radius:50%;background:rgba(217,119,6,.2);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+  .ob-step-text{font-size:13px;line-height:1.5;}
+  .ob-step-text strong{color:var(--text);}
+  .ob-cmd{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:var(--green);margin-top:6px;word-break:break-all;line-height:1.5;}
+  .ob-cmd-copy{display:inline-flex;align-items:center;gap:5px;background:var(--accent);border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+  .ob-cmd-copy:hover{opacity:.85;}
+  .ob-cmd-copy.copied{background:var(--green);}
+  .ob-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .ob-copy-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;transition:background .2s;}
+  .ob-copy-btn:hover{opacity:.9;}
+  .ob-copy-btn:disabled{opacity:.6;cursor:not-allowed;}
+  .ob-check-btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;}
+  .ob-check-btn:hover{opacity:.9;}
+  .ob-check-btn:disabled{opacity:.6;cursor:not-allowed;}
+  .ob-skip{font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;background:none;border:none;}
+  .ob-skip:hover{color:var(--text);}
+  .ob-status{font-size:12px;margin-top:12px;padding:10px 12px;border-radius:6px;display:none;line-height:1.5;}
+  .ob-status.checking{background:rgba(139,148,158,.08);border:1px solid rgba(139,148,158,.2);color:var(--muted);}
+  .ob-status.success{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:var(--green);}
+  .ob-status.warn{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);color:var(--accent);}
+  /* Consent notice */
+  .consent-box{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.25);border-radius:10px;padding:16px 18px;margin-bottom:20px;}
+  .consent-box .cb-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+  .consent-box .cb-body{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+  .consent-box .cb-body strong{color:var(--text);}
+  .consent-agree-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;width:100%;transition:opacity .15s;}
+  .consent-agree-btn:hover{opacity:.88;}
+  .sync-consent-banner{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.25);border-radius:10px;padding:16px 18px;margin-bottom:16px;}
+
+  /* ── Contextual Help Tour ── */
+  .ht-backdrop{position:fixed;inset:0;z-index:1200;pointer-events:none;}
+  .ht-spotlight{position:fixed;z-index:1201;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none;transition:all .35s cubic-bezier(.4,0,.2,1);}
+  .ht-tooltip{position:fixed;z-index:1202;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.4);transition:all .35s cubic-bezier(.4,0,.2,1);}
+  .ht-tooltip::before{content:'';position:absolute;width:10px;height:10px;background:var(--surface);border:1px solid var(--border);transform:rotate(45deg);}
+  .ht-tooltip.arrow-left::before{left:-6px;top:20px;border-right:none;border-top:none;}
+  .ht-tooltip.arrow-top::before{top:-6px;left:20px;border-bottom:none;border-right:none;}
+  .ht-tt-step{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
+  .ht-tt-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;}
+  .ht-tt-body{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+  .ht-tt-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .ht-tt-next{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+  .ht-tt-next:hover{opacity:.85;}
+  .ht-tt-skip{font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;}
+  .ht-tt-skip:hover{color:var(--text);}
+  .ht-tt-dots{display:flex;gap:4px;}
+  .ht-tt-dot{width:5px;height:5px;border-radius:50%;background:var(--border);}
+  .ht-tt-dot.active{background:var(--accent);}
+
+  /* Admin view */
+  .admin-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .admin-tbl{width:100%;border-collapse:collapse;}
+  .admin-tbl th{padding:9px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .admin-tbl td{padding:10px 13px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+  .admin-tbl tr:last-child td{border-bottom:none;}
+  .admin-tbl tr:hover td{background:var(--surface2);}
+  .role-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;}
+  .role-badge.admin{background:rgba(217,119,6,.2);color:var(--accent);}
+  .role-badge.user{background:rgba(88,166,255,.15);color:var(--blue);}
+  .view-btn{background:none;border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;}
+  .view-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .never-synced{color:var(--red);font-size:12px;}
+  .synced-ok{color:var(--green);font-size:12px;}
+
+  .loading{text-align:center;padding:32px;color:var(--muted);}
+  .empty{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+  .error-msg{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);color:var(--red);border-radius:6px;padding:10px 13px;font-size:13px;margin-bottom:14px;}
+
+  /* DB Management */
+  .db-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;}
+  .db-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
+  .db-card.accent{border-color:var(--accent);}
+  .db-card .dbc-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .db-card .dbc-value{font-size:22px;font-weight:700;margin-top:4px;line-height:1;}
+  .db-card .dbc-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+  .db-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+  .db-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;}
+  .db-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .db-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .db-btn.primary:hover{opacity:.9;color:#fff;}
+  .db-btn.danger{border-color:var(--red);color:var(--red);}
+  .db-btn.danger:hover{background:rgba(248,81,73,.08);}
+  .db-info-table{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px;}
+  .db-info-table table{width:100%;border-collapse:collapse;}
+  .db-info-table th{padding:8px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .db-info-table td{padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px;}
+  .db-info-table tr:last-child td{border-bottom:none;}
+  .db-toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .db-toast.show{opacity:1;}
+
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+  .hamburger{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text);flex-shrink:0;}
+  .mobile-topbar{display:none;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .mobile-topbar .logo{font-size:14px;font-weight:700;color:var(--text);}
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;}
+  @media(max-width:600px){
+    .app{flex-direction:column;}
+    .sidebar{position:fixed;top:0;left:0;height:100%;width:260px;z-index:100;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;}
+    .sidebar.open{transform:translateX(0);}
+    .sidebar-backdrop.open{display:block;}
+    .hamburger,.mobile-topbar{display:flex;}
+    .main{padding-top:0;}
+  }
+
+  /* ── Metric cards ── */
+  .metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+  @media(max-width:700px){.metrics-grid{grid-template-columns:1fr;}}
+  .metric-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .metric-card .mc-icon{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+  .metric-card .mc-value{font-size:36px;font-weight:700;color:var(--accent);line-height:1;margin:8px 0 14px;}
+  .metric-card .mc-rows{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .metric-card .mc-row{display:flex;justify-content:space-between;font-size:13px;}
+  .metric-card .mc-row span:first-child{color:var(--muted);}
+  .metric-card .mc-row span:last-child{font-weight:600;}
+
+  /* ── Charts ── */
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+  @media(max-width:700px){.charts-row{grid-template-columns:1fr;}}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+  .chart-card canvas{display:block;width:100%;}
+  .chart-card .chart-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+  .donut-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .donut-legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);}
+  .donut-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+  /* ── Tool summary table ── */
+  .tool-summary-tbl{width:100%;border-collapse:collapse;}
+  .tool-summary-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;}
+  .tool-summary-tbl td:last-child{text-align:right;font-weight:600;}
+  .tool-summary-tbl tr:last-child td{border-bottom:none;}
+  .tool-summary-tbl .tst-header td{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;background:var(--surface2);}
+</style>
+</head>
+<body>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+<div class="app">
+  <div class="mobile-topbar">
+    <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <span class="logo">Claude Code Tracker</span>
+  </div>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span>Claude Code Tracker</span>
+      </div>
+      <a id="githubWidget" href="https://github.com/m-shirt/claude-code-tracker" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;color:var(--text);text-decoration:none;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        <span style="flex:1">Star on GitHub</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </a>
+    </div>
+    <nav class="nav">
+      <div class="nav-label">Analytics</div>
+      <div class="nav-item active" data-view="dashboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-view="projects">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        <span>Projects</span>
+      </div>
+      <div class="nav-item" data-view="sessions">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span>Conversations</span>
+      </div>
+      <div class="nav-item" data-view="history">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>User Prompts</span>
+      </div>
+      <div class="nav-label">Manage</div>
+      <div class="nav-item" data-view="sync">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <span>Sync</span>
+      </div>
+      <div class="nav-item admin-only" data-view="admin" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span>Users</span>
+      </div>
+      <div class="nav-item admin-only" data-view="database" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span>Database</span>
+      </div>
+    </nav>
+    <div id="sidebarDemoBox" style="display:none;padding:8px 14px;border-top:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--accent);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">
+        <span>⚡</span><span>Demo Mode</span>
+      </div>
+      <button id="sidebarSeedBtn" class="admin-only" onclick="sidebarSeedDemo()" style="display:none;width:100%;padding:5px 8px;background:rgba(217,119,6,.12);color:var(--accent);border:1px solid rgba(217,119,6,.3);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;margin-bottom:4px;">🌱 Load Demo Data</button>
+      <button id="sidebarWipeBtn" class="admin-only" onclick="sidebarWipeDemo()" style="display:none;width:100%;padding:5px 8px;background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;">Wipe Demo Data</button>
+    </div>
+    <div class="theme-toggle">
+      <button class="theme-btn" data-theme="light" onclick="applyTheme('light')" title="Light">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span>Light</span>
+      </button>
+      <button class="theme-btn" data-theme="dark" onclick="applyTheme('dark')" title="Dark">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <span>Dark</span>
+      </button>
+    </div>
+    <div class="sidebar-user">
+      <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="sidebarName">Loading…</div>
+      <div class="user-email" id="sidebarEmail" style="margin-top:2px"></div>
+      <div class="user-role" id="sidebarRole"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="logout-btn" style="flex:1;margin-top:0" onclick="logout()">Sign out</button>
+        <button class="logout-btn" style="margin-top:0;width:32px;flex-shrink:0;padding:3px 0;font-size:13px;" onclick="restartHelpTour()" title="Restart tour">?</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- Global "viewing as" banner -->
+    <div id="asBanner" class="as-banner" style="display:none;position:sticky;top:0;z-index:50;margin:0;border-radius:0;border-left:none;border-right:none;border-top:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Viewing data for <strong id="asBannerEmail"></strong>
+      <button onclick="clearAsUser()">← Back to my data</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1><p>Overview of your Claude Code activity</p>
+        </div>
+        <div class="date-filter" id="dateFilter">
+          <button class="date-preset active" data-preset="all">All</button>
+          <button class="date-preset" data-preset="7d">7d</button>
+          <button class="date-preset" data-preset="30d">30d</button>
+          <button class="date-preset" data-preset="90d">90d</button>
+          <button class="date-preset" data-preset="month">This month</button>
+          <div class="date-range-inputs">
+            <input type="date" id="dateFrom" placeholder="From">
+            <span style="color:var(--muted);font-size:12px">–</span>
+            <input type="date" id="dateTo" placeholder="To">
+          </div>
+        </div>
+      </div>
+
+      <!-- Metric cards -->
+      <div class="metrics-grid" id="metricsGrid"><div class="loading">Loading…</div></div>
+
+      <!-- Charts row: token line + project donut -->
+      <div class="charts-row" id="chartsRow" style="display:none">
+        <div class="chart-card">
+          <div class="chart-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Token Usage Over Time
+          </div>
+          <canvas id="tokenLineChart" height="140"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0110 10"/></svg>
+            Project Activity Distribution
+          </div>
+          <canvas id="projectDonutChart" height="140"></canvas>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </div>
+
+      <!-- Tool Activity Summary (no bar chart) -->
+      <div id="toolChartsRow" style="display:none;margin-bottom:20px;">
+        <div class="chart-card">
+          <div class="chart-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Tool Activity Summary
+          </div>
+          <div id="toolSummaryTable"></div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Daily Message Activity
+          </div>
+          <canvas id="activityLineChart" height="140"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            Model Usage (tokens)
+          </div>
+          <div id="modelList"><div class="loading">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects -->
+    <div class="view" id="view-projects">
+      <div class="page-header"><h1>Projects</h1><p>All projects from synced data</p></div>
+      <div class="page-stats" id="projectsPageStats"></div>
+      <div class="filters">
+        <select class="select-input" id="projectUserFilter" onchange="filterProjects()"><option value="">All users</option></select>
+      </div>
+      <div class="projects-grid" id="projectsGrid"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Sessions -->
+    <div class="view" id="view-sessions">
+      <div class="page-header"><h1>Conversations</h1><p>All conversation sessions with Claude</p></div>
+      <div class="page-stats" id="sessionsPageStats"></div>
+      <div class="filters">
+        <input class="search-input" id="sessionSearch" placeholder="Search conversations…" oninput="filterSessions()">
+        <select class="select-input" id="sessionProjectFilter" onchange="filterSessions()"><option value="">All projects</option></select>
+        <select class="select-input" id="sessionUserFilter" onchange="filterSessions()"><option value="">All users</option></select>
+        <span class="filter-count" id="sessionCount"></span>
+      </div>
+      <div id="sessionsGroups"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Conversation -->
+    <div class="view" id="view-conversation">
+      <div class="conv-header">
+        <button class="back-btn" onclick="showView(_convBackView||'sessions')">← Back</button>
+        <div class="conv-info">
+          <div class="conv-title" id="convTitle">Session</div>
+          <div class="conv-meta" id="convMeta"></div>
+        </div>
+      </div>
+      <div class="messages" id="messagesContainer"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- History -->
+    <div class="view" id="view-history">
+      <div class="page-header"><h1>Prompts History</h1><p>All prompts you typed into Claude Code</p></div>
+      <div class="page-stats" id="historyPageStats"></div>
+      <div class="filters">
+        <input class="search-input" id="historySearch" placeholder="Search commands…" oninput="filterHistory()">
+        <select class="select-input" id="historyProjectFilter" onchange="filterHistory()"><option value="">All projects</option></select>
+        <select class="select-input" id="historyUserFilter" onchange="filterHistory()"><option value="">All users</option></select>
+        <span class="filter-count" id="historyCount"></span>
+      </div>
+      <div id="historyGroups"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Sync -->
+    <div class="view" id="view-sync">
+      <div class="page-header"><h1>Sync</h1><p>Keep your local Claude Code data in sync with the server</p></div>
+
+      <div class="sync-card">
+        <h3>Status</h3>
+        <div class="sync-status-row">
+          <div class="sync-dot" id="syncDot"></div>
+          <div class="sync-time" id="syncTime">Checking…</div>
+        </div>
+        <div class="sync-stats" id="syncStats"></div>
+      </div>
+
+      <div class="sync-card">
+        <h3>Run Sync</h3>
+        <!-- Demo mode notice -->
+        <div id="syncDemoNotice" style="display:none;background:rgba(139,148,158,.08);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.6;">
+          🚫 <strong style="color:var(--text)">Sync is disabled in Demo Mode.</strong><br>
+          Want to track your own Claude Code data? Deploy your own instance — it's free, open-source, and takes <strong style="color:var(--text)">less than 3 minutes</strong> on your local machine, Docker, Railway, Fly.io, or any Node.js host.<br><a href="https://github.com/m-shirt/claude-code-tracker" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;display:inline-block;margin-top:6px;">🚀 Get started on GitHub →</a>
+        </div>
+        <!-- Consent banner (hidden once agreed) -->
+        <div id="syncConsentBanner" class="sync-consent-banner" style="display:none">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:7px;">🤝 Team Data Sharing Agreement</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;">
+            By syncing you agree that your <strong style="color:var(--text)">sessions, conversations, prompts and token usage</strong> will be stored on this server and visible to <strong style="color:var(--text)">all administrators</strong> for team analytics. You can delete your data at any time from this page.
+          </div>
+          <button onclick="syncAgreeConsent()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">✅ I understand and agree</button>
+        </div>
+        <!-- Command (hidden until consent given) -->
+        <div id="syncCommandWrap">
+          <p style="color:var(--muted);font-size:13px;margin-bottom:12px;line-height:1.5">Paste this one-liner into your terminal — it downloads and runs the sync client directly from this server, then uploads your <code style="background:var(--surface2);padding:1px 6px;border-radius:3px">~/.claude/</code> data.</p>
+          <div class="command-box" id="syncCommand">
+            <button class="copy-btn" id="copyCommandBtn" onclick="copyCommand()">Copy</button>
+            <span id="syncCommandText">Loading…</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sync-card">
+        <h3>Automate with Cron</h3>
+        <div id="cronDemoNotice" style="display:none;background:rgba(139,148,158,.08);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.6;">
+          🚫 <strong style="color:var(--text)">Sync is disabled in Demo Mode.</strong>
+        </div>
+        <div id="cronCommandWrap">
+          <p style="color:var(--muted);font-size:13px;margin-bottom:12px;line-height:1.5">Add to your crontab to sync automatically every day at 9 AM:</p>
+          <div class="command-box" id="cronCommand">
+            <button class="copy-btn" id="copyCronBtn" onclick="copyCron()">Copy</button>
+            <span id="cronCommandText">Loading…</span>
+          </div>
+          <p style="color:var(--muted);font-size:11px;margin-top:10px">Run <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">crontab -e</code> and paste the line above.</p>
+        </div>
+        <div id="cronConsentNotice" style="display:none;font-size:13px;color:var(--muted);padding:8px 0;">Please agree to the data sharing terms in the <strong style="color:var(--text)">Run Sync</strong> section above to reveal this command.</div>
+      </div>
+
+      <div class="sync-card" style="border-color:rgba(248,81,73,.25)">
+        <h3 style="color:var(--red)">Danger Zone</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:3px">Delete my sync data</div>
+            <div style="font-size:12px;color:var(--muted)">Removes all your sessions, history and stats from the server. Your local <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">~/.claude/</code> files are not affected.</div>
+          </div>
+          <button id="deleteSyncBtn" onclick="deleteSyncData()" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete My Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Database -->
+    <div class="view" id="view-database">
+      <div class="page-header"><h1>Database</h1><p>Storage stats, health info, and backup tools</p></div>
+      <div class="db-actions">
+        <a id="backupBtn" class="db-btn primary" href="/api/admin/db/backup" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Backup (.db)
+        </a>
+        <button id="restoreBtn" class="db-btn" onclick="triggerRestoreUpload()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload &amp; Restore Backup
+        </button>
+        <input type="file" id="restoreFileInput" accept=".db" style="display:none" onchange="restoreDb(this)">
+        <button class="db-btn" onclick="loadDbStats()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Refresh Stats
+        </button>
+        <button class="db-btn danger" onclick="vacuumDb()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          VACUUM (Compact DB)
+        </button>
+      </div>
+      <div id="restoreProgress" style="display:none;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;">
+        <div id="restoreMsg" style="margin-bottom:8px"></div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+          <div id="restoreBar" style="height:100%;background:var(--accent);width:0%;transition:width .3s"></div>
+        </div>
+      </div>
+      <div id="dbStatsGrid" class="db-grid"><div class="loading">Loading…</div></div>
+      <div class="section-title" style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Storage Details</div>
+      <div class="db-info-table" id="dbInfoTable"><div class="loading" style="padding:16px">Loading…</div></div>
+    </div>
+    <div class="db-toast" id="dbToast"></div>
+
+    <!-- Admin -->
+    <div class="view" id="view-admin">
+      <div class="page-header"><h1>Users</h1><p>All registered users and their sync status</p></div>
+
+
+      <div class="page-stats" id="adminPageStats"></div>
+      <div class="admin-table-wrap">
+        <table class="admin-tbl">
+          <thead>
+            <tr>
+              <th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Last Login</th>
+              <th>Last Sync</th><th>Sessions</th><th>Data Size</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="adminUsersBody"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+
+  </main>
+</div>
+
+<!-- Onboarding Modal -->
+<div class="ob-overlay" id="obOverlay" style="display:none" onclick="if(event.target===this)skipOnboarding()">
+  <div class="ob-modal">
+    <div class="ob-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div class="ob-title">Welcome to Claude Code Tracker</div>
+    <div class="ob-sub">Your account is ready — before syncing, please review how your data will be used.</div>
+
+    <!-- Consent panel -->
+    <div id="obConsentPanel">
+      <div class="consent-box">
+        <div class="cb-title">🤝 Team Data Sharing Agreement</div>
+        <div class="cb-body">
+          By syncing your Claude Code data you agree that:<br><br>
+          • Your <strong>sessions, conversations, prompts and token usage</strong> will be uploaded to this server.<br>
+          • <strong>All administrators</strong> of this instance will be able to view your data for team analytics and oversight.<br>
+          • You can <strong>delete your data at any time</strong> from the Sync page.<br><br>
+          This data is stored privately on this server and is not shared with third parties.
+        </div>
+        <button class="consent-agree-btn" onclick="obAgreeConsent()">✅ I understand and agree — continue</button>
+      </div>
+      <div style="text-align:center">
+        <button class="ob-skip" onclick="skipOnboarding()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Demo mode notice (shown instead of sync steps) -->
+    <div id="obDemoNotice" style="display:none;background:rgba(139,148,158,.08);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
+      🚫 <strong style="color:var(--text)">Sync is disabled in Demo Mode.</strong><br>
+      Want to track your own Claude Code data? Deploy your own instance — it's free, open-source, and takes <strong style="color:var(--text)">less than 3 minutes</strong> on your local machine, Docker, Railway, Fly.io, or any Node.js host.<br><a href="https://github.com/m-shirt/claude-code-tracker" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;display:inline-block;margin-top:6px;">🚀 Get started on GitHub →</a>
+      <div style="margin-top:12px"><button class="ob-skip" onclick="skipOnboarding()" style="font-size:13px;color:var(--accent)">Close</button></div>
+    </div>
+
+    <!-- Sync steps (shown after consent) -->
+    <div id="obSyncSteps" style="display:none">
+    <div class="ob-steps">
+      <div class="ob-step">
+        <div class="ob-step-num">1</div>
+        <div class="ob-step-text">
+          <strong>Copy the sync command</strong><br>
+          It downloads the sync client and uploads your <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">~/.claude/</code> data in one step.
+          <div class="ob-cmd" id="obCmd">Loading…</div>
+          <button class="ob-cmd-copy" id="obCmdCopyBtn" onclick="obCopyCommand()" style="margin-top:8px">Copy</button>
+        </div>
+      </div>
+      <div class="ob-step">
+        <div class="ob-step-num">2</div>
+        <div class="ob-step-text"><strong>Open your terminal and paste it</strong><br>Node.js is required. The sync takes a few seconds.</div>
+      </div>
+      <div class="ob-step">
+        <div class="ob-step-num">3</div>
+        <div class="ob-step-text"><strong>Click "Check if synced" below</strong><br>We'll detect your data automatically and close this dialog.</div>
+      </div>
+    </div>
+    <div id="obStatus" class="ob-status"></div>
+    <div class="ob-actions" style="margin-top:16px">
+      <div>
+        <button class="ob-check-btn" id="obCheckBtn" onclick="obCheckSync()">Check if synced</button>
+        <div id="obError" style="display:none;font-size:11px;color:var(--red);margin-top:6px;line-height:1.5"></div>
+      </div>
+      <button class="ob-skip" onclick="skipOnboarding()">Skip for now</button>
+    </div>
+    </div><!-- /obSyncSteps -->
+  </div>
+</div>
+
+<!-- Help Tour -->
+<div class="ht-spotlight" id="htSpotlight" style="display:none"></div>
+<div class="ht-tooltip"   id="htTooltip"   style="display:none">
+  <div class="ht-tt-step"    id="htStep"></div>
+  <div class="ht-tt-title"   id="htTitle"></div>
+  <div class="ht-tt-body"    id="htBody"></div>
+  <div class="ht-tt-actions">
+    <div class="ht-tt-dots"  id="htDots"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="ht-tt-skip" onclick="skipHelpTour()">Skip tour</button>
+      <button class="ht-tt-next" id="htNext" onclick="htNext()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Routing ──────────────────────────────────────────────────────────────────
+const VIEW_PATHS = { dashboard:'/', projects:'/projects', sessions:'/conversations', history:'/prompts', sync:'/sync', admin:'/users', database:'/database' };
+const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([v,p])=>[p,v]));
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+  // Redraw charts so grid/axis colors update
+  setTimeout(() => {
+    if (typeof _lastSummary !== 'undefined' && _lastSummary) {
+      drawTokenLineChart(_lastSummary.tokensByDay || []);
+      drawProjectDonut(_lastSummary.projectTokens || []);
+      renderActivityChart(_lastSummary.dailyActivity || []);
+    }
+  }, 50);
+}
+(function() {
+  const saved = localStorage.getItem('theme');
+  const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (sysDark ? 'dark' : 'light'));
+  // Keep in sync if OS preference changes and no explicit choice saved
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light');
+  });
+})();
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+const TOKEN_KEY = 'claude_tracker_token';
+let currentUser = null;
+let asUserId = null;
+let asUserEmail = null;
+let asUserName = null;
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+function logout() {
+  localStorage.removeItem(TOKEN_KEY);
+  window.location.href = '/';
+}
+
+function decodeToken(token) {
+  try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
+}
+
+// ── Mobile sidebar ──────────────────────────────────────────────────────────
+function openSidebar() {
+  document.querySelector('.sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('open');
+}
+function closeSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+}
+
+// ── Mutable state (declared before init IIFE to avoid TDZ) ──────────────────
+let allSessions = [], allHistory = [], allProjects = [];
+let _convBackView = 'sessions', _histFlat = [], _histSessionCache = [];
+
+// On load: verify token
+(function init() {
+  const token = getToken();
+  if (!token) return window.location.href = '/';
+  const payload = decodeToken(token);
+  if (!payload || payload.exp * 1000 < Date.now()) return window.location.href = '/';
+  currentUser = payload;
+  document.getElementById('sidebarName').textContent = currentUser.name || currentUser.email.split('@')[0];
+  document.getElementById('sidebarEmail').textContent = currentUser.email;
+  const roleEl = document.getElementById('sidebarRole');
+  roleEl.textContent = currentUser.role;
+  roleEl.className = 'user-role role-' + currentUser.role;
+  if (currentUser.role === 'admin') {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+  }
+  Promise.all([api('/api/demo-status'), api('/api/config')]).then(([s, cfg]) => {
+    window._demoMode = !!cfg?.demoMode;
+    if (cfg?.demoMode) {
+      document.getElementById('restoreBtn')?.style && (document.getElementById('restoreBtn').style.display = 'none');
+      document.getElementById('sidebarDemoBox').style.display = '';
+    }
+    if (currentUser.role === 'admin') {
+      document.getElementById('sidebarSeedBtn').style.display = s?.isDemo ? 'none' : '';
+      document.getElementById('sidebarWipeBtn').style.display = (s?.isDemo && !cfg?.disableDemoWipe) ? '' : 'none';
+    }
+  });
+  // Restore view from URL on load, default to dashboard
+  const initialView = PATH_VIEWS[location.pathname] || 'dashboard';
+  showView(initialView, false);
+
+  // Start contextual help tour — wait until onboarding popup is closed if it's showing
+  setTimeout(() => {
+    const obVisible = document.getElementById('obOverlay').style.display !== 'none';
+    if (obVisible) {
+      // Poll until popup closes, then start tour
+      const poll = setInterval(() => {
+        if (document.getElementById('obOverlay').style.display === 'none') {
+          clearInterval(poll);
+          setTimeout(startHelpTour, 400);
+        }
+      }, 300);
+    } else {
+      startHelpTour();
+    }
+  }, 800);
+
+  // Date filter presets and custom range
+  document.getElementById('dateFilter')?.addEventListener('click', e => {
+    const btn = e.target.closest('.date-preset');
+    if (!btn) return;
+    document.querySelectorAll('.date-preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const preset = btn.dataset.preset;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const fromEl = document.getElementById('dateFrom');
+    const toEl   = document.getElementById('dateTo');
+    if (preset === 'all')   { fromEl.value = ''; toEl.value = ''; }
+    else if (preset === '7d')  { fromEl.value = fmt(new Date(now - 6*86400000)); toEl.value = fmt(now); }
+    else if (preset === '30d') { fromEl.value = fmt(new Date(now - 29*86400000)); toEl.value = fmt(now); }
+    else if (preset === '90d') { fromEl.value = fmt(new Date(now - 89*86400000)); toEl.value = fmt(now); }
+    else if (preset === 'month') { fromEl.value = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); toEl.value = fmt(now); }
+    loadDashboard();
+  });
+
+  ['dateFrom', 'dateTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      document.querySelectorAll('.date-preset').forEach(b => b.classList.remove('active'));
+      loadDashboard();
+    });
+  });
+})();
+
+// ── API fetch wrapper ───────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const qs = asUserId ? (path.includes('?') ? `&asUser=${asUserId}` : `?asUser=${asUserId}`) : '';
+  const res = await fetch(path + qs, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  });
+  if (res.status === 401) { logout(); return null; }
+  return res.json();
+}
+
+// ── Nav ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => { showView(el.dataset.view); closeSidebar(); });
+});
+
+function showView(view, pushState = true) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
+  if (pushState && VIEW_PATHS[view]) history.pushState({ view }, '', VIEW_PATHS[view]);
+  if (view === 'dashboard') loadDashboard();
+  if (view === 'projects')  { allProjects = []; loadProjects(); }
+  if (view === 'sessions')  { allSessions = []; loadSessions(); }
+  if (view === 'history')   { allHistory  = []; loadHistory();  }
+  if (view === 'sync')      loadSync();
+  if (view === 'admin')     loadAdmin();
+  if (view === 'database')  loadDbStats();
+}
+
+window.addEventListener('popstate', e => {
+  const view = (e.state && e.state.view) || PATH_VIEWS[location.pathname] || 'dashboard';
+  showView(view, false);
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const fmtNum = n => !n ? '0' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n);
+const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+const fmtDateTime = ts => ts ? new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const shortModel = m => m.replace('claude-','').replace(/-20\d{6}$/,'');
+const escHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toggleGroup(el) { el.closest('.group').classList.toggle('collapsed'); }
+
+// Admin: view as user
+function viewAsUser(id, email, name) {
+  asUserId = id;
+  asUserEmail = email;
+  asUserName = name || null;
+  document.getElementById('asBannerEmail').textContent = name ? `${name} (${email})` : email;
+  document.getElementById('asBanner').style.display = '';
+  allSessions = []; allProjects = []; allHistory = [];
+  showView('dashboard');
+}
+function clearAsUser() {
+  asUserId = null; asUserEmail = null; asUserName = null;
+  document.getElementById('asBanner').style.display = 'none';
+  allSessions = []; allProjects = []; allHistory = [];
+  loadDashboard();
+}
+
+// ── Dashboard ───────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('metricsGrid').innerHTML = '<div class="loading">Loading…</div>';
+  const from = document.getElementById('dateFrom')?.value;
+  const to   = document.getElementById('dateTo')?.value;
+  const qs   = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to)   qs.set('to', to);
+  const qstr = qs.toString();
+  const summary = await api('/api/summary' + (qstr ? '?' + qstr : ''));
+  if (!summary) return;
+  if (summary.error) {
+    document.getElementById('metricsGrid').innerHTML = `<div class="empty">${summary.error}</div>`;
+    document.getElementById('modelList').innerHTML = '';
+    if (!asUserId) showOnboarding();
+    return;
+  }
+
+  // For admins: check if their own personal data exists (admin default view is 'all').
+  // If not, show the onboarding popup so they know how to sync.
+  if (!asUserId && currentUser.role === 'admin') {
+    api('/api/summary?asUser=' + currentUser.id).then(own => {
+      if (own && own.error) showOnboarding();
+    });
+  }
+
+  const totalTokens = (summary.tokenInput||0) + (summary.tokenOutput||0) + (summary.tokenCache||0) ||
+    Object.values(summary.modelUsage||{}).reduce((s,m)=>s+(m.inputTokens||0)+(m.outputTokens||0)+(m.cacheReadInputTokens||0), 0);
+
+  const fmtBig = n => !n ? '0' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n);
+  const fmtFull = n => (n||0).toLocaleString();
+
+  // Build Users card HTML (admin only extra card injected before metricsGrid)
+  const usersExtra = summary.totalUsers != null
+    ? `<div style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <div class="stat-card" style="flex:1;min-width:120px">
+          <div class="label">Users</div>
+          <div class="value">${fmtNum(summary.totalUsers)}</div>
+          <div class="sub">registered</div>
+        </div>
+        <div class="stat-card" style="flex:1;min-width:120px">
+          <div class="label">First Session</div>
+          <div class="value" style="font-size:14px;padding-top:4px">${fmtDate(summary.firstSession)}</div>
+        </div>
+        <div class="stat-card" style="flex:1;min-width:120px">
+          <div class="label">Last Synced</div>
+          <div class="value" style="font-size:13px;padding-top:4px">${summary.lastSynced ? fmtDateTime(summary.lastSynced) : 'Never'}</div>
+        </div>
+      </div>` : '';
+
+  document.getElementById('metricsGrid').innerHTML = `
+    ${usersExtra}
+    <div class="metric-card">
+      <div class="mc-icon">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Conversations
+      </div>
+      <div class="mc-value">${fmtBig(summary.totalSessions)}</div>
+      <div class="mc-rows">
+        <div class="mc-row"><span>This Month</span><span>${fmtFull(summary.conversationsThisMonth)}</span></div>
+        <div class="mc-row"><span>This Week</span><span>${fmtFull(summary.conversationsThisWeek)}</span></div>
+        <div class="mc-row"><span>Messages</span><span>${fmtBig(summary.totalMessages)}</span></div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-icon">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Projects
+      </div>
+      <div class="mc-value">${fmtBig(summary.totalProjects)}</div>
+      <div class="mc-rows">
+        <div class="mc-row"><span>Sessions This Month</span><span>${fmtFull(summary.conversationsThisMonth)}</span></div>
+        <div class="mc-row"><span>Sessions This Week</span><span>${fmtFull(summary.conversationsThisWeek)}</span></div>
+        <div class="mc-row"><span>Prompts in History</span><span>${fmtBig(summary.totalCommands)}</span></div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="mc-icon">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Tokens
+      </div>
+      <div class="mc-value">${fmtBig(totalTokens)}</div>
+      <div class="mc-rows">
+        <div class="mc-row"><span>Input</span><span>${fmtFull(summary.tokenInput)}</span></div>
+        <div class="mc-row"><span>Output</span><span>${fmtFull(summary.tokenOutput)}</span></div>
+        <div class="mc-row"><span>Cache Read</span><span>${fmtFull(summary.tokenCache)}</span></div>
+      </div>
+    </div>
+  `;
+
+  // Cache summary for theme-change redraws
+  window._lastSummary = summary;
+
+  // Show chart containers
+  if ((summary.tokensByDay||[]).length || (summary.projectTokens||[]).length) {
+    document.getElementById('chartsRow').style.display = '';
+    setTimeout(() => {
+      drawTokenLineChart(summary.tokensByDay || []);
+      drawProjectDonut(summary.projectTokens || []);
+    }, 0);
+  }
+  if ((summary.toolStats?.topTools||[]).length) {
+    document.getElementById('toolChartsRow').style.display = '';
+    setTimeout(() => {
+      renderToolSummary(summary.toolStats);
+    }, 0);
+  }
+
+  renderActivityChart(summary.dailyActivity||[]);
+
+  // Merge models that share the same short name (e.g. claude-sonnet-4-5 + claude-sonnet-4-5-20251001)
+  const mergedModels = {};
+  Object.entries(summary.modelUsage||{}).forEach(([name, m]) => {
+    const key = shortModel(name);
+    if (!mergedModels[key]) mergedModels[key] = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0 };
+    mergedModels[key].inputTokens          += (m.inputTokens          || 0);
+    mergedModels[key].outputTokens         += (m.outputTokens         || 0);
+    mergedModels[key].cacheReadInputTokens += (m.cacheReadInputTokens || 0);
+  });
+  const models = Object.entries(mergedModels);
+  const maxTok = Math.max(1, ...models.map(([,m])=>(m.inputTokens||0)+(m.outputTokens||0)+(m.cacheReadInputTokens||0)));
+  document.getElementById('modelList').innerHTML = models.length === 0
+    ? '<div class="empty">No model usage data</div>'
+    : models.sort((a,b) => {
+        const ta = (a[1].inputTokens||0)+(a[1].outputTokens||0)+(a[1].cacheReadInputTokens||0);
+        const tb = (b[1].inputTokens||0)+(b[1].outputTokens||0)+(b[1].cacheReadInputTokens||0);
+        return tb - ta;
+      }).map(([name,m]) => {
+        const total = (m.inputTokens||0)+(m.outputTokens||0)+(m.cacheReadInputTokens||0);
+        return `<div class="model-row">
+          <span class="model-name">${name}</span>
+          <div class="model-bar-wrap"><div class="model-bar" style="width:${(total/maxTok*100).toFixed(1)}%"></div></div>
+          <span class="model-tokens">${fmtNum(total)} tok</span>
+        </div>`;
+      }).join('');
+}
+
+function renderActivityChart(activity) {
+  const canvas = document.getElementById('activityLineChart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 300;
+  const cssH = 140;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  if (!activity.length) {
+    ctx.fillStyle = getCssVar('--muted');
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No activity data', W / 2, H / 2);
+    return;
+  }
+  const borderColor = getCssVar('--border');
+  const mutedColor  = getCssVar('--muted');
+  const accentColor = '#d97706';
+  const pad = { top: 10, right: 10, bottom: 28, left: 40 };
+  const iW = W - pad.left - pad.right;
+  const iH = H - pad.top - pad.bottom;
+  const maxVal = Math.max(...activity.map(d => d.messageCount), 1);
+
+  // Grid lines
+  ctx.strokeStyle = borderColor; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + iH - (i / 4) * iH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + iW, y); ctx.stroke();
+    const lbl = i === 0 ? '0' : Math.round(maxVal * i / 4).toString();
+    ctx.fillStyle = mutedColor; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(lbl, pad.left - 4, y + 3);
+  }
+
+  const xStep = iW / (activity.length - 1 || 1);
+  const pts = activity.map((d, i) => ({
+    x: pad.left + i * xStep,
+    y: pad.top + iH - (d.messageCount / maxVal) * iH
+  }));
+
+  // Area fill with gradient
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + iH);
+  grad.addColorStop(0, 'rgba(217,119,6,0.25)');
+  grad.addColorStop(1, 'rgba(217,119,6,0)');
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pad.top + iH);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length - 1].x, pad.top + iH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const cp1x = (pts[i-1].x + pts[i].x) / 2, cp1y = pts[i-1].y;
+    const cp2x = (pts[i-1].x + pts[i].x) / 2, cp2y = pts[i].y;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i].x, pts[i].y);
+  }
+  ctx.strokeStyle = accentColor; ctx.lineWidth = 2; ctx.stroke();
+
+  // X-axis labels
+  ctx.fillStyle = mutedColor; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  const step = Math.ceil(activity.length / 8);
+  activity.forEach((d, i) => {
+    if (i % step === 0 || i === activity.length - 1) {
+      ctx.fillText(d.date.slice(5), pts[i].x, H - 4);
+    }
+  });
+}
+
+// ── Canvas chart helpers ─────────────────────────────────────────────────────
+const CHART_COLORS = ['#d97706','#3b82f6','#10b981','#8b5cf6','#f59e0b','#6b7280','#ef4444','#06b6d4'];
+
+function getCssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawTokenLineChart(data) {
+  const canvas = document.getElementById('tokenLineChart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 300;
+  const cssH = 140;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  if (!data.length) {
+    ctx.fillStyle = getCssVar('--muted');
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No token data for last 30 days', W/2, H/2);
+    return;
+  }
+  const borderColor = getCssVar('--border');
+  const mutedColor  = getCssVar('--muted');
+  const pad = { top: 10, right: 10, bottom: 28, left: 44 };
+  const iW = W - pad.left - pad.right;
+  const iH = H - pad.top  - pad.bottom;
+  const maxVal = Math.max(...data.map(d => d.tokens), 1);
+  // Grid lines
+  const gridCount = 4;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= gridCount; i++) {
+    const y = pad.top + iH - (i / gridCount) * iH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + iW, y); ctx.stroke();
+    const label = i === 0 ? '0' : ((maxVal * i / gridCount) >= 1000
+      ? ((maxVal * i / gridCount) / 1000).toFixed(0) + 'K'
+      : Math.round(maxVal * i / gridCount).toString());
+    ctx.fillStyle = mutedColor;
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(label, pad.left - 4, y + 3);
+  }
+  // Line
+  const xStep = data.length > 1 ? iW / (data.length - 1) : iW;
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = pad.left + i * xStep;
+    const y = pad.top + iH - (d.tokens / maxVal) * iH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  // Area fill
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = pad.left + i * xStep;
+    const y = pad.top + iH - (d.tokens / maxVal) * iH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(pad.left + (data.length - 1) * xStep, pad.top + iH);
+  ctx.lineTo(pad.left, pad.top + iH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + iH);
+  grad.addColorStop(0, 'rgba(217,119,6,0.25)');
+  grad.addColorStop(1, 'rgba(217,119,6,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  // Dots
+  ctx.fillStyle = '#d97706';
+  data.forEach((d, i) => {
+    const x = pad.left + i * xStep;
+    const y = pad.top + iH - (d.tokens / maxVal) * iH;
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+  });
+  // X-axis labels (show every Nth)
+  const step = Math.max(1, Math.floor(data.length / 6));
+  ctx.fillStyle = mutedColor;
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  data.forEach((d, i) => {
+    if (i % step !== 0 && i !== data.length - 1) return;
+    const x = pad.left + i * xStep;
+    ctx.fillText(d.date.slice(5), x, H - 4);
+  });
+}
+
+function drawProjectDonut(data) {
+  const canvas = document.getElementById('projectDonutChart');
+  if (!canvas || !data.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 300;
+  const cssH = 200;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const radius = Math.min(cx, cy) - 10;
+  const inner  = radius * 0.55;
+  const total = data.reduce((s, d) => s + d.tokens, 0) || 1;
+  let angle = -Math.PI / 2;
+  data.forEach((d, i) => {
+    const sweep = (d.tokens / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, angle, angle + sweep);
+    ctx.closePath();
+    ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length];
+    ctx.fill();
+    angle += sweep;
+  });
+  // Inner hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+  ctx.fillStyle = getCssVar('--surface');
+  ctx.fill();
+  // Center label
+  ctx.fillStyle = getCssVar('--muted');
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(data.length + ' projects', cx, cy + 4);
+  // Legend
+  const legendEl = document.getElementById('donutLegend');
+  if (legendEl) {
+    legendEl.innerHTML = data.map((d, i) =>
+      `<div class="donut-legend-item">
+        <div class="donut-legend-dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></div>
+        <span>${escHtml(d.name)}</span>
+      </div>`
+    ).join('');
+  }
+}
+
+function drawToolBars(data) {
+  const canvas = document.getElementById('toolBarChart');
+  if (!canvas || !data.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth || 300;
+  const cssH = 200;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  const borderColor = getCssVar('--border');
+  const mutedColor  = getCssVar('--muted');
+  const pad = { top: 10, right: 10, bottom: 50, left: 36 };
+  const iW = W - pad.left - pad.right;
+  const iH = H - pad.top  - pad.bottom;
+  const maxVal = Math.max(...data.map(d => d.count), 1);
+  // Grid lines
+  const gridCount = 4;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= gridCount; i++) {
+    const y = pad.top + iH - (i / gridCount) * iH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + iW, y); ctx.stroke();
+    const label = i === 0 ? '0' : Math.round(maxVal * i / gridCount).toString();
+    ctx.fillStyle = mutedColor;
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(label, pad.left - 4, y + 3);
+  }
+  // Bars
+  const barGap = 4;
+  const barW = Math.max(4, (iW / data.length) - barGap);
+  data.forEach((d, i) => {
+    const x = pad.left + i * (barW + barGap);
+    const bH = Math.max(2, (d.count / maxVal) * iH);
+    const y = pad.top + iH - bH;
+    ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length];
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, barW, bH, [3, 3, 0, 0]) : ctx.rect(x, y, barW, bH);
+    ctx.fill();
+    // X-axis label (rotated)
+    ctx.save();
+    ctx.translate(x + barW / 2, pad.top + iH + 6);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = mutedColor;
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    const shortName = d.name.length > 14 ? d.name.slice(0, 12) + '…' : d.name;
+    ctx.fillText(shortName, 0, 0);
+    ctx.restore();
+  });
+}
+
+function renderToolSummary(toolStats) {
+  const el = document.getElementById('toolSummaryTable');
+  if (!el || !toolStats) return;
+  const top5 = (toolStats.topTools || []).slice(0, 5);
+  el.innerHTML = `<table class="tool-summary-tbl">
+    <tr><td>Total Tool Calls</td><td>${(toolStats.totalToolCalls||0).toLocaleString()}</td></tr>
+    <tr><td>Unique Tools Used</td><td>${toolStats.uniqueTools||0}</td></tr>
+    <tr class="tst-header"><td colspan="2">Top Tools</td></tr>
+    ${top5.map(t => `<tr><td>${escHtml(t.name)}</td><td>${t.count.toLocaleString()}</td></tr>`).join('')}
+  </table>`;
+}
+
+// ── Projects ─────────────────────────────────────────────────────────────────
+async function loadProjects() {
+  document.getElementById('projectsGrid').innerHTML = '<div class="loading">Loading…</div>';
+  allProjects = await api('/api/projects') || [];
+  if (allProjects.error) { document.getElementById('projectsGrid').innerHTML=`<div class="empty">${allProjects.error}</div>`; return; }
+  if (!allProjects.length) { document.getElementById('projectsGrid').innerHTML='<div class="empty">No projects found. Sync data first.</div>'; return; }
+
+  const totalSess = allProjects.reduce((s,p)=>s+p.sessionCount,0);
+  const totalMsgs = allProjects.reduce((s,p)=>s+p.totalMessages,0);
+  const mostActive = allProjects.reduce((a,b)=>b.totalMessages>a.totalMessages?b:a);
+  document.getElementById('projectsPageStats').innerHTML = `
+    <div class="pstat accent"><div class="ps-label">Projects</div><div class="ps-value">${allProjects.length}</div></div>
+    <div class="pstat"><div class="ps-label">Sessions</div><div class="ps-value">${fmtNum(totalSess)}</div></div>
+    <div class="pstat"><div class="ps-label">Messages</div><div class="ps-value">${fmtNum(totalMsgs)}</div></div>
+    <div class="pstat"><div class="ps-label">Avg Msgs/Session</div><div class="ps-value">${totalSess?(totalMsgs/totalSess).toFixed(1):0}</div></div>
+    <div class="pstat"><div class="ps-label">Most Active</div><div class="ps-value" style="font-size:12px;padding-top:4px">${mostActive.name.split('/').pop()}</div><div class="ps-sub">${fmtNum(mostActive.totalMessages)} msgs</div></div>
+  `;
+  const projUsers = [...new Set(allProjects.flatMap(p => p.users||[]))].sort();
+  const pusel = document.getElementById('projectUserFilter');
+  const curPU = pusel.value;
+  pusel.innerHTML = '<option value="">All users</option>' + projUsers.map(u=>`<option value="${u}">${u}</option>`).join('');
+  if (curPU) pusel.value = curPU;
+  pusel.style.display = projUsers.length > 1 ? '' : 'none';
+
+  renderProjects();
+}
+
+function filterProjects() {
+  renderProjects();
+}
+
+function renderProjects() {
+  const user = document.getElementById('projectUserFilter').value;
+  const filtered = user ? allProjects.filter(p => (p.users||[]).includes(user)) : allProjects;
+
+  if (!filtered.length) { document.getElementById('projectsGrid').innerHTML = '<div class="empty">No projects found.</div>'; return; }
+
+  document.getElementById('projectsGrid').innerHTML = filtered.map(p => {
+    const userBadges = (p.users||[]).map(u => `<span class="badge" style="color:var(--blue)">${escHtml(u)}</span>`).join('');
+    return `
+    <div class="project-card" onclick="openProject('${p.id}')">
+      <div class="proj-name">${p.name}</div>
+      <div class="proj-badges">
+        <span class="badge blue">${p.sessionCount} sessions</span>
+        <span class="badge">${fmtNum(p.totalMessages)} msgs</span>
+        <span class="badge green">~${p.sessionCount?(p.totalMessages/p.sessionCount).toFixed(1):0}/session</span>
+      </div>
+      ${userBadges ? `<div class="proj-badges" style="margin-top:4px">${userBadges}</div>` : ''}
+      <div class="proj-date">Last: ${fmtDate(p.lastActivity)}</div>
+    </div>`;
+  }).join('');
+}
+
+function openProject(id) {
+  document.getElementById('sessionProjectFilter').value = id;
+  showView('sessions');
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+async function loadSessions() {
+  document.getElementById('sessionsGroups').innerHTML = '<div class="loading">Loading…</div>';
+  allSessions = await api('/api/sessions') || [];
+  if (allSessions.error) { document.getElementById('sessionsGroups').innerHTML=`<div class="empty">${allSessions.error}</div>`; return; }
+  const projIds = [...new Set(allSessions.map(s=>s.projectId))];
+  const sel = document.getElementById('sessionProjectFilter');
+  const curProj = sel.value;
+  sel.innerHTML = '<option value="">All projects</option>' +
+    projIds.map(id => `<option value="${id}">${allSessions.find(s=>s.projectId===id)?.projectName||id}</option>`).join('');
+  if (curProj) sel.value = curProj;
+
+  const userNames = [...new Set(allSessions.map(s=>s.userName).filter(Boolean))].sort();
+  const usel = document.getElementById('sessionUserFilter');
+  const curUser = usel.value;
+  usel.innerHTML = '<option value="">All users</option>' + userNames.map(u=>`<option value="${u}">${u}</option>`).join('');
+  if (curUser) usel.value = curUser;
+  usel.style.display = userNames.length > 1 ? '' : 'none';
+
+  filterSessions();
+}
+
+function filterSessions() {
+  const q    = document.getElementById('sessionSearch').value.toLowerCase();
+  const proj = document.getElementById('sessionProjectFilter').value;
+  const user = document.getElementById('sessionUserFilter').value;
+  let f = allSessions;
+  if (proj) f = f.filter(s => s.projectId === proj);
+  if (user) f = f.filter(s => (s.userName || '') === user);
+  if (q)    f = f.filter(s => (s.preview||'').toLowerCase().includes(q) || (s.projectName||'').toLowerCase().includes(q));
+  renderSessions(f);
+}
+
+function renderSessions(sessions) {
+  const container = document.getElementById('sessionsGroups');
+  if (!sessions.length) { container.innerHTML='<div class="empty">No conversations found</div>'; document.getElementById('sessionsPageStats').innerHTML=''; return; }
+
+  const totalMsgs   = sessions.reduce((s,x)=>s+x.messageCount,0);
+  const totalTokens = sessions.reduce((s,x)=>s+(x.totalTokens||0),0);
+  const projIds     = [...new Set(sessions.map(s=>s.projectId))];
+  const times       = sessions.map(s=>s.startTime).filter(Boolean).sort();
+
+  document.getElementById('sessionsPageStats').innerHTML = `
+    <div class="pstat accent"><div class="ps-label">Conversations</div><div class="ps-value">${sessions.length}</div></div>
+    <div class="pstat"><div class="ps-label">Projects</div><div class="ps-value">${projIds.length}</div></div>
+    <div class="pstat"><div class="ps-label">Messages</div><div class="ps-value">${fmtNum(totalMsgs)}</div></div>
+    <div class="pstat"><div class="ps-label">Total Tokens</div><div class="ps-value">${fmtNum(totalTokens)}</div></div>
+    <div class="pstat"><div class="ps-label">Avg Tokens/Conv</div><div class="ps-value">${sessions.length?fmtNum(Math.round(totalTokens/sessions.length)):'0'}</div></div>
+    <div class="pstat"><div class="ps-label">Date Range</div><div class="ps-value" style="font-size:12px;padding-top:4px">${fmtDate(times[0])}</div><div class="ps-sub">→ ${fmtDate(times[times.length-1])}</div></div>
+  `;
+  document.getElementById('sessionCount').textContent = sessions.length + ' conversations';
+
+  const showUser = sessions.some(s => s.userName);
+  const rows = sessions.map(s => `
+    <tr class="clickable"
+        data-id="${escHtml(s.id)}"
+        data-pid="${escHtml(s.projectId)}"
+        data-pname="${escHtml(s.projectName||s.projectId)}"
+        data-mc="${s.messageCount}"
+        data-st="${escHtml(s.startTime||'')}"
+        onclick="openSession(this.dataset.id,this.dataset.pid,this.dataset.pname,+this.dataset.mc,this.dataset.st)">
+      <td class="preview-cell">${escHtml(s.preview||'(no preview)')}</td>
+      <td style="color:var(--muted);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(s.projectName||s.projectId)}</td>
+      ${showUser ? `<td style="color:var(--blue);font-size:12px;white-space:nowrap">${escHtml(s.userName||'')}</td>` : ''}
+      <td>${s.messageCount}</td>
+      <td style="font-size:12px;white-space:nowrap;color:var(--accent)">${s.totalTokens ? fmtNum(s.totalTokens) : '—'}</td>
+      <td class="time-cell">${fmtDateTime(s.startTime)}</td>
+      <td class="time-cell">${s.endTime?fmtDateTime(s.endTime):'—'}</td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th>Preview</th><th>Project</th>${showUser?'<th>User</th>':''}<th>Msgs</th><th>Tokens</th><th>Started</th><th>Ended</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function openSession(id, projectId, projectName, messageCount, startTime, backView, highlightText, highlightTs) {
+  _convBackView = backView || 'sessions';
+  document.getElementById('convTitle').textContent = projectName;
+  document.getElementById('convMeta').textContent = `${messageCount} messages · ${fmtDateTime(startTime)} · ${id}`;
+  document.getElementById('messagesContainer').innerHTML = '<div class="loading">Loading messages…</div>';
+  showView('conversation');
+  document.querySelector('.nav-item[data-view="sessions"]').classList.add('active');
+  const data = await api(`/api/session/${id}?project=${projectId}`);
+  if (!data || data.error) { document.getElementById('messagesContainer').innerHTML=`<div class="empty">${data?.error||'Error'}</div>`; return; }
+  const msgs = data.messages || [];
+  if (!msgs.length) { document.getElementById('messagesContainer').innerHTML='<div class="empty">No messages</div>'; return; }
+  if (highlightText || highlightTs) {
+    // Find the best matching message index
+    const ht = (highlightText || '').trim();
+    let bestIdx = 0, bestScore = Infinity;
+    msgs.forEach((m, i) => {
+      if ((m.role || m.type) !== 'user') return;
+      const bodyText = (m.text || '').trim();
+      let textScore = Infinity;
+      if (ht) {
+        if (bodyText === ht)               textScore = 0;
+        else if (bodyText.startsWith(ht))  textScore = 1;
+        else if (ht.startsWith(bodyText))  textScore = 2;
+        else if (bodyText.includes(ht) || ht.includes(bodyText)) textScore = 3;
+        else {
+          let ci = 0;
+          while (ci < Math.min(bodyText.length, ht.length) && bodyText[ci] === ht[ci]) ci++;
+          textScore = 100 + (ht.length - ci);
+        }
+      }
+      let tsScore = 0;
+      if (highlightTs && m.timestamp) {
+        tsScore = Math.abs(new Date(m.timestamp).getTime() - highlightTs) / 1000;
+      }
+      const score = ht ? textScore * 1000 + tsScore : tsScore;
+      if (score < bestScore) { bestScore = score; bestIdx = i; }
+    });
+
+    // Show all messages, highlight and scroll to the matched one
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = msgs.map((m, i) => renderMessage(m, i)).join('');
+    const target = container.querySelector(`.msg[data-idx="${bestIdx}"]`);
+    if (target) {
+      target.classList.add('highlighted');
+      setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+    }
+  } else {
+    document.getElementById('messagesContainer').innerHTML = msgs.map((m, i) => renderMessage(m, i)).join('');
+  }
+}
+
+const CLAUDE_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="vertical-align:-2px;flex-shrink:0"><path d="M12 2l2.582 7.948H22.9l-6.741 4.898 2.582 7.948L12 18.035l-6.741 4.759 2.582-7.948L1.1 9.948H9.418z"/></svg>`;
+
+function renderMessage(msg, idx) {
+  const role = msg.role||msg.type;
+  const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+  const usage = msg.usage ? `<span class="usage-pill">in:${fmtNum(msg.usage.input_tokens)} out:${fmtNum(msg.usage.output_tokens)}</span>` : '';
+  const model = msg.model ? `<span style="color:var(--muted);font-size:10px">${shortModel(msg.model)}</span>` : '';
+  const tools = (msg.toolCalls||[]).length ? `<div class="tool-calls">${msg.toolCalls.map(tc=>`
+    <div class="tool-call">
+      <div class="tool-call-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        ${tc.name}</div>
+      <div class="tool-call-body">${escHtml(JSON.stringify(tc.input,null,2))}</div>
+    </div>`).join('')}</div>` : '';
+
+  let senderLabel;
+  if (role === 'user') {
+    const name = asUserId ? (asUserName || asUserEmail.split('@')[0]) : (currentUser?.name || currentUser?.email?.split('@')[0] || 'User');
+    senderLabel = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;flex-shrink:0"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ${escHtml(name)}`;
+  } else if (role === 'summary') {
+    senderLabel = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Summary`;
+  } else {
+    senderLabel = `${CLAUDE_ICON} Claude Code ${model}`;
+  }
+
+  return `<div class="msg ${role}" data-idx="${idx??''}">
+    <div class="msg-header"><span style="display:flex;align-items:center;gap:5px">${senderLabel}</span><span>${usage} ${time}</span></div>
+    <div class="msg-body">${escHtml(msg.text)}</div>
+    ${tools}
+  </div>`;
+}
+
+// ── History ─────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  document.getElementById('historyGroups').innerHTML = '<div class="loading">Loading…</div>';
+  const [histRes, sessRes] = await Promise.all([
+    api('/api/history?limit=2000'),
+    Array.isArray(allSessions) && allSessions.length ? Promise.resolve(allSessions) : api('/api/sessions')
+  ]);
+  allHistory = Array.isArray(histRes) ? histRes : [];
+  if (!Array.isArray(histRes)) { document.getElementById('historyGroups').innerHTML=`<div class="empty">${histRes?.error||'Error loading history'}</div>`; return; }
+  if (Array.isArray(sessRes)) allSessions = sessRes;
+  const projs = [...new Set(allHistory.map(h=>h.project).filter(Boolean))];
+  const sel = document.getElementById('historyProjectFilter');
+  sel.innerHTML = '<option value="">All projects</option>' + projs.map(p=>`<option value="${p}">${p.replace(/\/Users\/[^/]+\//,'~/')}</option>`).join('');
+
+  const histUsers = [...new Set(allHistory.map(h=>h.userName).filter(Boolean))].sort();
+  const husel = document.getElementById('historyUserFilter');
+  husel.innerHTML = '<option value="">All users</option>' + histUsers.map(u=>`<option value="${u}">${u}</option>`).join('');
+  husel.style.display = histUsers.length > 1 ? '' : 'none';
+
+  filterHistory();
+}
+
+function filterHistory() {
+  const q    = document.getElementById('historySearch').value.toLowerCase();
+  const proj = document.getElementById('historyProjectFilter').value;
+  const user = document.getElementById('historyUserFilter').value;
+  let f = allHistory;
+  if (proj) f = f.filter(h => h.project === proj);
+  if (user) f = f.filter(h => (h.userName || '') === user);
+  if (q)    f = f.filter(h => (h.display||'').toLowerCase().includes(q));
+  renderHistory(f);
+}
+
+function renderHistory(entries) {
+  _histFlat = entries;
+  _histSessionCache = entries.map(h => findSessionForEntry(h));
+  const container = document.getElementById('historyGroups');
+  if (!entries.length) { container.innerHTML='<div class="empty">No history found</div>'; document.getElementById('historyPageStats').innerHTML=''; return; }
+
+  const projs = [...new Set(entries.map(e=>e.project).filter(Boolean))];
+  const times  = entries.map(e=>e.timestamp).filter(Boolean).sort();
+
+  document.getElementById('historyPageStats').innerHTML = `
+    <div class="pstat accent"><div class="ps-label">Commands</div><div class="ps-value">${fmtNum(entries.length)}</div></div>
+    <div class="pstat"><div class="ps-label">Projects</div><div class="ps-value">${projs.length}</div></div>
+    <div class="pstat"><div class="ps-label">Date Range</div><div class="ps-value" style="font-size:12px;padding-top:4px">${fmtDate(times[0])}</div><div class="ps-sub">→ ${fmtDate(times[times.length-1])}</div></div>
+  `;
+  document.getElementById('historyCount').textContent = entries.length + ' commands';
+
+  const showUser = entries.some(e => e.userName);
+  const rows = entries.slice(0, 500).map((h, idx) => {
+    const sess     = _histSessionCache[idx];
+    const msgCount = sess ? sess.messageCount : null;
+    const hasData  = msgCount !== null && msgCount > 0;
+    const badge    = hasData
+      ? `<span class="msg-count has-msgs" style="font-size:10px">view</span>`
+      : '';
+    const proj     = (h.project||'').replace(/\/Users\/[^/]+\//,'~/');
+    const rowAttrs = hasData
+      ? `class="clickable" title="View conversation" onclick="openHistoryEntry(${idx})"`
+      : '';
+    return `<tr ${rowAttrs}>
+      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:380px">${escHtml(h.display||'')}${badge}</td>
+      <td style="color:var(--muted);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(proj)}</td>
+      ${showUser ? `<td style="color:var(--blue);font-size:12px;white-space:nowrap">${escHtml(h.userName||'')}</td>` : ''}
+      <td class="time-cell">${fmtDateTime(h.timestamp)}</td>
+    </tr>`;
+  }).join('');
+
+  const cols = showUser ? 4 : 3;
+  const more = entries.length > 500
+    ? `<tr><td colspan="${cols}" style="color:var(--muted);text-align:center;padding:8px;font-size:12px">…${entries.length-500} more — use the search filter to narrow results</td></tr>`
+    : '';
+
+  container.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th>Command</th><th>Project</th>${showUser?'<th>User</th>':''}<th>Time</th></tr></thead>
+        <tbody>${rows}${more}</tbody>
+      </table>
+    </div>`;
+}
+
+function normalizePath(p) {
+  if (!p) return p;
+  // /Users/xxx/foo → ~/foo  (for matching against session projectNames)
+  return p.replace(/^\/Users\/[^/]+\//, '~/').replace(/^\/home\/[^/]+\//, '~/');
+}
+
+function pathToProjectId(p) {
+  // /Users/username/my project → -Users-username-my-project  (Claude's folder ID format)
+  // Claude replaces both '/' and ' ' with '-' when encoding paths as folder names
+  if (!p) return '';
+  return p.replace(/[/ ]/g, '-');
+}
+
+function findSessionForEntry(h) {
+  if (!Array.isArray(allSessions) || !allSessions.length) return null;
+  const proj      = h.project;
+  const normProj  = normalizePath(proj);
+  const projId    = pathToProjectId(proj);
+  const ts        = h.timestamp;
+  // Primary: match by projectId (most reliable — avoids dash→slash corruption in projectName)
+  let matches = allSessions.filter(s => s.projectId === projId);
+  // Fallback: exact projectName match (normalized)
+  if (!matches.length) matches = allSessions.filter(s => s.projectName === proj || s.projectName === normProj);
+  // Last resort: leaf folder name
+  if (!matches.length && normProj) {
+    const leaf = normProj.split('/').filter(Boolean).pop() || '';
+    matches = allSessions.filter(s => s.projectName && s.projectName.split('/').filter(Boolean).pop() === leaf);
+  }
+  if (!matches.length) return null;
+  let best = matches[0], bestDiff = Infinity;
+  for (const s of matches) {
+    const start = s.startTime ? new Date(s.startTime).getTime() : 0;
+    const end   = s.endTime   ? new Date(s.endTime).getTime()   : start + 3600000;
+    if (ts >= start && ts <= end) return s;
+    const diff = Math.min(Math.abs(ts - start), Math.abs(ts - end));
+    if (diff < bestDiff) { bestDiff = diff; best = s; }
+  }
+  return best;
+}
+
+function openHistoryEntry(idx) {
+  const h = _histFlat[idx];
+  if (!h) return;
+  const session = _histSessionCache[idx];
+  if (session && session.messageCount === 0) return; // guard: shouldn't be clickable
+  if (!session) {
+    showDbToast('No matching session — showing all sessions', false);
+    showView('sessions');
+    if (!allSessions.length) loadSessions();
+    return;
+  }
+  openSession(session.id, session.projectId, session.projectName, session.messageCount, session.startTime, 'history', h.display, h.timestamp);
+}
+
+// ── Sync ─────────────────────────────────────────────────────────────────────
+function buildSyncCmd() {
+  const baseUrl = window.location.origin;
+  const token   = getToken();
+  return `curl -fsSL ${baseUrl}/sync-client.js | node - --url ${baseUrl} --token ${token}`;
+}
+
+async function loadSync() {
+  const status = await api('/api/sync/status');
+  const dot    = document.getElementById('syncDot');
+  const timeEl = document.getElementById('syncTime');
+
+  if (status?.syncedAt) {
+    dot.className = 'sync-dot synced';
+    timeEl.innerHTML = `Last synced: <strong>${fmtDateTime(status.syncedAt)}</strong>`;
+    document.getElementById('syncStats').innerHTML = `
+      <div class="sync-stat"><div class="ss-label">Sessions</div><div class="ss-value">${fmtNum(status.sessionCount)}</div></div>
+      <div class="sync-stat"><div class="ss-label">Data Size</div><div class="ss-value">${status.rawSizeBytes?(status.rawSizeBytes/1e6).toFixed(1)+'MB':'—'}</div></div>
+      <div class="sync-stat"><div class="ss-label">Syncs</div><div class="ss-value">${status.syncCount||0}</div></div>
+    `;
+  } else {
+    dot.className = 'sync-dot never';
+    timeEl.innerHTML = '<span style="color:var(--red)">Never synced</span>';
+    document.getElementById('syncStats').innerHTML = '';
+  }
+
+  const cmd = buildSyncCmd();
+  const baseUrl = window.location.origin;
+  document.getElementById('syncCommandText').textContent = cmd;
+  document.getElementById('cronCommandText').textContent =
+    `0 9 * * * curl -fsSL ${baseUrl}/sync-client.js | node - --url ${baseUrl} --token ${getToken()}`;
+
+  // Demo mode — hide everything and show notice
+  if (window._demoMode) {
+    document.getElementById('syncDemoNotice').style.display   = '';
+    document.getElementById('syncConsentBanner').style.display = 'none';
+    document.getElementById('syncCommandWrap').style.display  = 'none';
+    document.getElementById('cronDemoNotice').style.display   = '';
+    document.getElementById('cronCommandWrap').style.display  = 'none';
+    document.getElementById('cronConsentNotice').style.display = 'none';
+    return;
+  }
+  // Show consent banner if user hasn't agreed yet
+  const agreed = hasSyncConsent();
+  document.getElementById('syncDemoNotice').style.display     = 'none';
+  document.getElementById('syncConsentBanner').style.display  = agreed ? 'none' : '';
+  document.getElementById('syncCommandWrap').style.display    = agreed ? '' : 'none';
+  document.getElementById('cronDemoNotice').style.display     = 'none';
+  document.getElementById('cronCommandWrap').style.display    = agreed ? '' : 'none';
+  document.getElementById('cronConsentNotice').style.display  = agreed ? 'none' : '';
+}
+
+function flashCopy(btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.textContent = 'Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+}
+function copyCommand() { navigator.clipboard.writeText(document.getElementById('syncCommandText').textContent); flashCopy('copyCommandBtn'); }
+function copyCron()    { navigator.clipboard.writeText(document.getElementById('cronCommandText').textContent); flashCopy('copyCronBtn'); }
+
+async function deleteSyncData() {
+  if (!confirm('Delete all your synced data from the server?\n\nThis cannot be undone. Your local ~/.claude/ files are not affected.')) return;
+  const btn = document.getElementById('deleteSyncBtn');
+  btn.textContent = 'Deleting…';
+  btn.disabled = true;
+  try {
+    const r = await api('/api/sync/data', { method: 'DELETE' });
+    if (r?.ok) {
+      await loadSync();
+      showView('dashboard');
+      loadDashboard();
+    } else {
+      alert('Failed: ' + (r?.error || 'Unknown error'));
+      btn.textContent = 'Delete My Data';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+    btn.textContent = 'Delete My Data';
+    btn.disabled = false;
+  }
+}
+
+// ── Contextual Help Tour ─────────────────────────────────────────────────────
+const HT_KEY = () => 'help_tour_done_' + (currentUser?.id || '');
+
+const HT_STEPS = [
+  { selector: '.nav-item[data-view="dashboard"]', title: 'Dashboard', body: 'Your analytics home — token usage, daily activity, top projects and model breakdown all in one view.', arrow: 'left' },
+  { selector: '.nav-item[data-view="sessions"]',  title: 'Conversations', body: 'Browse every Claude Code conversation session. See token counts, messages, and click into individual chats.', arrow: 'left' },
+  { selector: '.nav-item[data-view="projects"]',  title: 'Projects', body: 'All your projects with session counts and message totals. Click a project to filter conversations.', arrow: 'left' },
+  { selector: '.nav-item[data-view="history"]',   title: 'User Prompts', body: 'Your full prompt history — searchable and filterable. Great for finding past commands.', arrow: 'left' },
+  { selector: '.nav-item[data-view="sync"]',      title: 'Sync', body: 'Get your personal sync command here. Run it once or set up a cron job for automatic syncing.', arrow: 'left' },
+  { selector: '.sidebar-user',                    title: 'Your Account', body: 'Your name, email and role are shown here. Click Sign out to log out.', arrow: 'left' },
+];
+
+let _htStep = 0;
+
+function startHelpTour() {
+  if (localStorage.getItem(HT_KEY())) return; // already done
+  _htStep = 0;
+  renderHtStep();
+}
+
+function skipHelpTour() {
+  localStorage.setItem(HT_KEY(), '1');
+  document.getElementById('htSpotlight').style.display = 'none';
+  document.getElementById('htTooltip').style.display   = 'none';
+}
+
+function restartHelpTour() {
+  localStorage.removeItem(HT_KEY());
+  _htStep = 0;
+  renderHtStep();
+}
+
+function htNext() {
+  _htStep++;
+  if (_htStep >= HT_STEPS.length) { skipHelpTour(); return; }
+  renderHtStep();
+}
+
+function renderHtStep() {
+  const step  = HT_STEPS[_htStep];
+  const el    = document.querySelector(step.selector);
+  if (!el) { htNext(); return; }
+
+  const rect  = el.getBoundingClientRect();
+  const pad   = 6;
+  const spot  = document.getElementById('htSpotlight');
+  const tip   = document.getElementById('htTooltip');
+
+  spot.style.display = '';
+  spot.style.left    = (rect.left - pad) + 'px';
+  spot.style.top     = (rect.top  - pad) + 'px';
+  spot.style.width   = (rect.width  + pad*2) + 'px';
+  spot.style.height  = (rect.height + pad*2) + 'px';
+
+  // Dots
+  document.getElementById('htDots').innerHTML = HT_STEPS.map((_,i) =>
+    `<div class="ht-tt-dot${i===_htStep?' active':''}"></div>`).join('');
+
+  document.getElementById('htStep').textContent  = `Step ${_htStep+1} of ${HT_STEPS.length}`;
+  document.getElementById('htTitle').textContent = step.title;
+  document.getElementById('htBody').textContent  = step.body;
+  document.getElementById('htNext').textContent  = _htStep === HT_STEPS.length-1 ? 'Done ✓' : 'Next →';
+
+  // Position tooltip
+  tip.className = 'ht-tooltip arrow-' + (step.arrow || 'left');
+  tip.style.display = '';
+
+  requestAnimationFrame(() => {
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    let left, top;
+    if (step.arrow === 'left') {
+      left = rect.right + 14;
+      top  = rect.top - 4;
+      // Flip to left side if off right edge
+      if (left + tw > window.innerWidth - 8) {
+        tip.className = 'ht-tooltip arrow-right';
+        left = rect.left - tw - 14;
+      }
+    } else {
+      left = rect.left;
+      top  = rect.bottom + 14;
+    }
+    // Clamp vertically so tooltip never goes off bottom/top of screen
+    top = Math.max(8, Math.min(top, window.innerHeight - th - 8));
+    // Clamp horizontally
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  });
+}
+
+// ── Sync Consent ─────────────────────────────────────────────────────────────
+let _syncConsented = false;
+function hasSyncConsent()   { return _syncConsented; }
+function grantSyncConsent() { _syncConsented = true; }
+
+function obAgreeConsent() {
+  grantSyncConsent();
+  document.getElementById('obConsentPanel').style.display  = 'none';
+  if (window._demoMode) {
+    document.getElementById('obDemoNotice').style.display  = '';
+  } else {
+    document.getElementById('obSyncSteps').style.display   = '';
+  }
+}
+
+function syncAgreeConsent() {
+  grantSyncConsent();
+  document.getElementById('syncConsentBanner').style.display  = 'none';
+  document.getElementById('syncCommandWrap').style.display    = '';
+  document.getElementById('cronCommandWrap').style.display    = '';
+  document.getElementById('cronConsentNotice').style.display  = 'none';
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+let _obPollTimer = null;
+let _obSkippedThisSession = false;
+const OB_DONE_KEY = 'ob_done_' + (currentUser?.id || '');
+
+function showOnboarding() {
+  if (localStorage.getItem(OB_DONE_KEY)) return; // permanently dismissed
+  if (_obSkippedThisSession) return;             // skipped this page load
+  clearInterval(_obPollTimer);
+  document.getElementById('obCmd').textContent = buildSyncCmd();
+  document.getElementById('obCmdCopyBtn').textContent = 'Copy';
+  document.getElementById('obCmdCopyBtn').classList.remove('copied');
+  document.getElementById('obCheckBtn').disabled = false;
+  document.getElementById('obError').style.display = 'none';
+  setObStatus('', '');
+  // Show consent panel first always; demo notice shows only after agreeing
+  const agreed = hasSyncConsent();
+  document.getElementById('obConsentPanel').style.display = agreed ? 'none' : '';
+  document.getElementById('obSyncSteps').style.display    = (agreed && !window._demoMode) ? '' : 'none';
+  document.getElementById('obDemoNotice').style.display   = (agreed && window._demoMode) ? '' : 'none';
+  document.getElementById('obOverlay').style.display = 'flex';
+}
+
+function skipOnboarding() {
+  clearInterval(_obPollTimer);
+  _obSkippedThisSession = true;
+  document.getElementById('obOverlay').style.display = 'none';
+}
+
+function dismissOnboardingPermanently() {
+  localStorage.setItem(OB_DONE_KEY, '1');
+  skipOnboarding();
+}
+
+function setObStatus(type, html) {
+  const el = document.getElementById('obStatus');
+  el.className = 'ob-status' + (type ? ' ' + type : '');
+  el.innerHTML = html;
+  el.style.display = type ? '' : 'none';
+}
+
+function obCopyCommand() {
+  navigator.clipboard.writeText(buildSyncCmd());
+  const btn = document.getElementById('obCmdCopyBtn');
+  btn.textContent = '✓ Copied';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+}
+
+async function obCheckSync() {
+  clearInterval(_obPollTimer);
+  const checkBtn  = document.getElementById('obCheckBtn');
+  const errorEl   = document.getElementById('obError');
+  let attempts = 0;
+  const MAX = 6;
+
+  errorEl.style.display = 'none';
+
+  async function poll() {
+    attempts++;
+    checkBtn.disabled = true;
+    setObStatus('checking', `⏳ Checking… (${attempts}/${MAX})`);
+
+    let status = null;
+    try { status = await api('/api/sync/status'); } catch {}
+
+    checkBtn.disabled = false;
+
+    if (status?.syncedAt) {
+      clearInterval(_obPollTimer);
+      errorEl.style.display = 'none';
+      setObStatus('success', '✅ Synced! Loading your data…');
+      setTimeout(() => {
+        dismissOnboardingPermanently();
+        loadDashboard();
+      }, 1200);
+      return true;
+    }
+
+    if (attempts >= MAX) {
+      clearInterval(_obPollTimer);
+      setObStatus('', '');
+      errorEl.innerHTML = '❌ Sync failed or timed out — check that Node.js is installed and the command ran without errors in your terminal.';
+      errorEl.style.display = 'block';
+      return true;
+    }
+
+    // Show error hint from the very first failed check
+    setObStatus('checking', `⏳ Not synced yet — next check in 5s… (${attempts}/${MAX})`);
+    errorEl.innerHTML = 'Not detected yet — make sure you ran the command in your terminal.';
+    errorEl.style.display = 'block';
+    return false;
+  }
+
+  const done = await poll();
+  if (!done) {
+    _obPollTimer = setInterval(async () => {
+      const done = await poll();
+      if (done) clearInterval(_obPollTimer);
+    }, 5000);
+  }
+}
+
+// ── Database Management ───────────────────────────────────────────────────────
+function showDbToast(msg, ok = true) {
+  const el = document.getElementById('dbToast');
+  el.textContent = msg;
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function fmtBytes(bytes) {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+async function loadDbStats() {
+  document.getElementById('dbStatsGrid').innerHTML = '<div class="loading">Loading…</div>';
+  document.getElementById('dbInfoTable').innerHTML = '<div class="loading" style="padding:16px">Loading…</div>';
+
+  const stats = await api('/api/admin/db/stats');
+  if (!stats || stats.error) {
+    document.getElementById('dbStatsGrid').innerHTML = `<div class="empty">${stats?.error || 'Failed to load stats'}</div>`;
+    return;
+  }
+
+  const totalSize = stats.fileSizeBytes + (stats.walSizeBytes || 0);
+
+  document.getElementById('dbStatsGrid').innerHTML = `
+    <div class="db-card accent">
+      <div class="dbc-label">DB File Size</div>
+      <div class="dbc-value">${fmtBytes(stats.fileSizeBytes)}</div>
+      <div class="dbc-sub">on disk</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">WAL File</div>
+      <div class="dbc-value">${fmtBytes(stats.walSizeBytes)}</div>
+      <div class="dbc-sub">write-ahead log</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Total Size</div>
+      <div class="dbc-value">${fmtBytes(totalSize)}</div>
+      <div class="dbc-sub">db + wal</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Users</div>
+      <div class="dbc-value">${stats.userCount}</div>
+      <div class="dbc-sub">${stats.syncedCount} synced</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Data Records</div>
+      <div class="dbc-value">${stats.dataCount}</div>
+      <div class="dbc-sub">user data rows</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Raw Data Stored</div>
+      <div class="dbc-value">${fmtBytes(stats.totalRawBytes)}</div>
+      <div class="dbc-sub">pre-compression</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Total Syncs</div>
+      <div class="dbc-value">${fmtNum(stats.totalSyncRuns)}</div>
+      <div class="dbc-sub">all time</div>
+    </div>
+    <div class="db-card">
+      <div class="dbc-label">Free Pages</div>
+      <div class="dbc-value">${fmtNum(stats.freePages)}</div>
+      <div class="dbc-sub">of ${fmtNum(stats.pageCount)} pages</div>
+    </div>
+  `;
+
+  const usedPct = stats.pageCount > 0 ? ((stats.usedPages / stats.pageCount) * 100).toFixed(1) : 0;
+  document.getElementById('dbInfoTable').innerHTML = `
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Database file path</td><td style="font-family:monospace;font-size:12px;color:var(--muted)">${stats.dbPath || 'SQLite (server-side)'}</td></tr>
+        <tr><td>Page size</td><td>${fmtNum(stats.pageSize)} bytes</td></tr>
+        <tr><td>Total pages</td><td>${fmtNum(stats.pageCount)}</td></tr>
+        <tr><td>Used pages</td><td>${fmtNum(stats.usedPages)} (${usedPct}%)</td></tr>
+        <tr><td>Free pages</td><td>${fmtNum(stats.freePages)}</td></tr>
+        <tr><td>Journal mode</td><td>WAL (Write-Ahead Logging)</td></tr>
+        <tr><td>Users registered</td><td>${stats.userCount}</td></tr>
+        <tr><td>Users with synced data</td><td>${stats.syncedCount}</td></tr>
+        <tr><td>Total sync runs</td><td>${fmtNum(stats.totalSyncRuns)}</td></tr>
+        <tr><td>Total raw payload stored</td><td>${fmtBytes(stats.totalRawBytes)}</td></tr>
+      </tbody>
+    </table>
+  `;
+
+  // Update backup link to include auth header approach — use dynamic download
+  document.getElementById('backupBtn').onclick = (e) => {
+    e.preventDefault();
+    downloadBackup();
+  };
+}
+
+async function downloadBackup() {
+  const btn = document.getElementById('backupBtn');
+  btn.textContent = 'Preparing…';
+  try {
+    const res = await fetch('/api/admin/db/backup', {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showDbToast('Backup failed: ' + (err.error || res.statusText), false);
+      return;
+    }
+    const blob = await res.blob();
+    const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `tracker-backup-${ts}.db`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showDbToast('Backup downloaded successfully!');
+  } catch (err) {
+    showDbToast('Download error: ' + err.message, false);
+  } finally {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Backup (.db)`;
+  }
+}
+
+function triggerRestoreUpload() {
+  document.getElementById('restoreFileInput').value = '';
+  document.getElementById('restoreFileInput').click();
+}
+
+async function restoreDb(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (!confirm(`Replace the entire live database with "${file.name}"?\n\nThis will overwrite ALL current data and restart the server. A backup (.bak) will be kept on the server.`)) return;
+
+  const progressEl = document.getElementById('restoreProgress');
+  const msgEl      = document.getElementById('restoreMsg');
+  const barEl      = document.getElementById('restoreBar');
+
+  progressEl.style.display = '';
+  msgEl.textContent = `Uploading ${(file.size / 1e6).toFixed(2)} MB…`;
+  barEl.style.width = '0%';
+
+  try {
+    // Show upload progress via XHR
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/admin/db/restore');
+      xhr.setRequestHeader('Authorization', `Bearer ${getToken()}`);
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round(e.loaded / e.total * 90);
+          barEl.style.width = pct + '%';
+          msgEl.textContent = `Uploading… ${pct}%`;
+        }
+      };
+
+      xhr.onload = () => {
+        barEl.style.width = '95%';
+        const res = JSON.parse(xhr.responseText);
+        if (xhr.status === 200 && res.ok) resolve(res);
+        else reject(new Error(res.error || 'Upload failed'));
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(file);
+    });
+
+    barEl.style.width = '100%';
+    msgEl.textContent = '✅ Restored! Server is restarting — reconnecting…';
+
+    // Poll until server is back up
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      msgEl.textContent = `✅ Restored! Waiting for server to restart… (${attempts}s)`;
+      try {
+        const r = await fetch('/');
+        if (r.ok) {
+          clearInterval(poll);
+          msgEl.textContent = '✅ Server is back! Reloading…';
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } catch {}
+      if (attempts > 30) {
+        clearInterval(poll);
+        msgEl.textContent = '⚠️ Server taking longer than expected — try refreshing manually.';
+      }
+    }, 1000);
+
+  } catch (err) {
+    progressEl.style.display = 'none';
+    showDbToast('Restore failed: ' + err.message, false);
+  }
+}
+
+async function vacuumDb() {
+  if (!confirm('Run VACUUM on the database? This compacts unused space and may take a moment.')) return;
+  const btn = document.querySelector('.db-btn.danger');
+  const origText = btn.innerHTML;
+  btn.textContent = 'Running VACUUM…';
+  btn.disabled = true;
+  const res = await api('/api/admin/db/vacuum', { method: 'POST' });
+  btn.innerHTML = origText;
+  btn.disabled = false;
+  if (res?.ok) {
+    showDbToast(res.message || 'VACUUM completed!');
+    loadDbStats();
+  } else {
+    showDbToast('VACUUM failed: ' + (res?.error || 'unknown error'), false);
+  }
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+async function loadDemo() {
+  const demoStatus = await api('/api/admin/demo/status');
+  const isDemo = demoStatus?.isDemo;
+  document.getElementById('demoBanner').style.display   = isDemo ? '' : 'none';
+  document.getElementById('demoNoBanner').style.display = isDemo ? 'none' : '';
+}
+
+async function loadAdmin() {
+  document.getElementById('adminUsersBody').innerHTML = '<tr><td colspan="9" class="loading">Loading…</td></tr>';
+
+  const users = await api('/api/admin/users');
+
+  if (!users || users.error) {
+    document.getElementById('adminUsersBody').innerHTML = `<tr><td colspan="9" class="empty">${users?.error||'Error'}</td></tr>`;
+    return;
+  }
+
+  const synced = users.filter(u => u.synced_at).length;
+  document.getElementById('adminPageStats').innerHTML = `
+    <div class="pstat accent"><div class="ps-label">Users</div><div class="ps-value">${users.length}</div></div>
+    <div class="pstat"><div class="ps-label">Synced</div><div class="ps-value">${synced}</div><div class="ps-sub">of ${users.length}</div></div>
+    <div class="pstat"><div class="ps-label">Total Sessions</div><div class="ps-value">${fmtNum(users.reduce((s,u)=>s+(u.sessionCount||0),0))}</div></div>
+    <div class="pstat"><div class="ps-label">Total Data</div><div class="ps-value">${((users.reduce((s,u)=>s+(u.raw_size_bytes||0),0))/1e6).toFixed(1)}MB</div></div>
+  `;
+
+  document.getElementById('adminUsersBody').innerHTML = users.map(u => `
+    <tr>
+      <td style="font-weight:600">${escHtml(u.name || u.email.split('@')[0])}</td>
+      <td style="color:var(--muted);font-size:12px">${escHtml(u.email)}</td>
+      <td><span class="role-badge ${u.role}">${u.role}</span></td>
+      <td class="time-cell">${fmtDate(u.created_at)}</td>
+      <td class="time-cell">${u.last_seen_at ? fmtDateTime(u.last_seen_at) : '<span class="never-synced">Never</span>'}</td>
+      <td class="time-cell">${u.synced_at ? '<span class="synced-ok">'+fmtDateTime(u.synced_at)+'</span>' : '<span class="never-synced">Never</span>'}</td>
+      <td>${u.sessionCount||0}</td>
+      <td>${u.raw_size_bytes ? (u.raw_size_bytes/1e6).toFixed(1)+'MB' : '—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <button class="view-btn" data-uid="${u.id}" data-email="${escHtml(u.email)}" data-name="${escHtml(u.name||'')}" onclick="viewAsUser(this.dataset.uid, this.dataset.email, this.dataset.name)">View Data</button>
+        ${window._demoMode ? '' : `<button class="view-btn" style="background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.25)" onclick="clearUserData(${u.id},'${escHtml(u.email)}')">Clear Data</button>`}
+        ${!window._demoMode && String(u.id) !== String(currentUser.id) && !['admin@claude-code-tracker.com','user@claude-code-tracker.com'].includes(u.email) ? `<button class="view-btn" style="background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)" onclick="deleteUser(${u.id},'${escHtml(u.email)}')">Delete</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function clearUserData(id, email) {
+  if (!confirm(`Clear all Claude data for ${email}?\n\nThe account will remain but all synced sessions, projects and stats will be deleted.`)) return;
+  const r = await api(`/api/admin/users/${id}/data`, { method: 'DELETE' });
+  if (r?.ok) loadAdmin();
+  else alert('Failed: ' + (r?.error || 'Unknown error'));
+}
+
+async function deleteUser(id, email) {
+  if (!confirm(`Permanently delete user ${email}?\n\nThis removes the account and all their data.`)) return;
+  const r = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+  if (r?.ok) loadAdmin();
+  else alert('Failed: ' + (r?.error || 'Unknown error'));
+}
+
+async function seedDemo() {
+  const btn = document.getElementById('seedDemoBtn');
+  btn.textContent = '⏳ Seeding…';
+  btn.disabled = true;
+  try {
+    const r = await api('/api/admin/demo/seed', { method: 'POST' });
+    if (r?.skipped) {
+      if (!confirm('Demo data already exists. Re-seed with fresh data?')) { btn.textContent = '🌱 Load Demo Data'; btn.disabled = false; return; }
+      await api('/api/admin/demo/seed', { method: 'POST', body: JSON.stringify({ force: true }) });
+    }
+    await loadAdmin();
+  } catch (e) {
+    alert('Seed failed: ' + e.message);
+  }
+  btn.textContent = '🌱 Load Demo Data';
+  btn.disabled = false;
+}
+
+async function sidebarSeedDemo() {
+  const btn = document.getElementById('sidebarSeedBtn');
+  btn.textContent = '⏳ Seeding…';
+  btn.disabled = true;
+  try {
+    const r = await api('/api/admin/demo/seed', { method: 'POST' });
+    if (r?.skipped) {
+      if (!confirm('Demo data already exists. Re-seed with fresh data?')) { btn.textContent = '🌱 Load Demo Data'; btn.disabled = false; return; }
+      await api('/api/admin/demo/seed', { method: 'POST', body: JSON.stringify({ force: true }) });
+    }
+    btn.style.display = 'none';
+    document.getElementById('sidebarWipeBtn').style.display = '';
+    loadDashboard();
+    if (document.getElementById('view-admin').classList.contains('active')) loadAdmin();
+  } catch (e) {
+    alert('Seed failed: ' + e.message);
+  }
+  btn.textContent = '🌱 Load Demo Data';
+  btn.disabled = false;
+}
+
+async function sidebarWipeDemo() {
+  if (!confirm('This will permanently delete ALL users and data and start with an empty database.\n\nAre you sure?')) return;
+  const btn = document.getElementById('sidebarWipeBtn');
+  btn.textContent = '⏳ Wiping…';
+  btn.disabled = true;
+  try {
+    await api('/api/admin/demo/reset', { method: 'POST' });
+    localStorage.removeItem('claude_tracker_token');
+    window.location.href = '/';
+  } catch (e) {
+    alert('Reset failed: ' + e.message);
+    btn.textContent = 'Wipe Demo Data';
+    btn.disabled = false;
+  }
+}
+
+async function resetDemo() {
+  if (!confirm('This will permanently delete ALL users and data and start with an empty database.\n\nAre you sure?')) return;
+  const btn = document.getElementById('resetDemoBtn');
+  btn.textContent = '⏳ Wiping…';
+  btn.disabled = true;
+  try {
+    await api('/api/admin/demo/reset', { method: 'POST' });
+    localStorage.removeItem('claude_tracker_token');
+    window.location.href = '/';
+  } catch (e) {
+    alert('Reset failed: ' + e.message);
+    btn.textContent = '🗑 Start Fresh — Wipe Demo Data';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
