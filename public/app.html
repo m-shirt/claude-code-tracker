@@ -1691,8 +1691,12 @@ async function deleteSyncData() {
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 let _obPollTimer = null;
+let _obSkippedThisSession = false;
+const OB_DONE_KEY = 'ob_done_' + (currentUser?.id || '');
 
 function showOnboarding() {
+  if (localStorage.getItem(OB_DONE_KEY)) return; // permanently dismissed
+  if (_obSkippedThisSession) return;             // skipped this page load
   clearInterval(_obPollTimer);
   document.getElementById('obCmd').textContent = buildSyncCmd();
   document.getElementById('obCmdCopyBtn').textContent = 'Copy';
@@ -1705,7 +1709,13 @@ function showOnboarding() {
 
 function skipOnboarding() {
   clearInterval(_obPollTimer);
+  _obSkippedThisSession = true;
   document.getElementById('obOverlay').style.display = 'none';
+}
+
+function dismissOnboardingPermanently() {
+  localStorage.setItem(OB_DONE_KEY, '1');
+  skipOnboarding();
 }
 
 function setObStatus(type, html) {
@@ -1747,7 +1757,7 @@ async function obCheckSync() {
       errorEl.style.display = 'none';
       setObStatus('success', '✅ Synced! Loading your data…');
       setTimeout(() => {
-        document.getElementById('obOverlay').style.display = 'none';
+        dismissOnboardingPermanently();
         loadDashboard();
       }, 1200);
       return true;
